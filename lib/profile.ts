@@ -1,25 +1,39 @@
-export type Profile = { skills: string[]; titles: string[]; yearsExperience: number | null };
+import { findSkills } from "./skills";
+import type { Level, Profile } from "./types";
 
-const SKILLS = [
-  "javascript", "typescript", "react", "next.js", "vue", "angular", "svelte", "node", "express", "python", "django", "flask", "fastapi",
-  "java", "spring", "kotlin", "swift", "swiftui", "ios", "android", "c#", ".net", "c++", "go", "rust", "ruby", "rails", "php", "laravel",
-  "sql", "postgres", "mysql", "mongodb", "redis", "graphql", "rest", "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "linux",
-  "git", "ci/cd", "html", "css", "tailwind", "figma", "ux", "ui design", "data analysis", "pandas", "machine learning", "pytorch", "tensorflow",
-  "excel", "tableau", "power bi", "seo", "marketing", "sales", "project management", "agile", "scrum", "customer support", "accounting",
-  "roblox", "lua", "unity", "blender", "3d modeling",
-];
+const ROLE = "developer|engineer|designer|analyst|manager|scientist|architect|consultant|marketer|accountant|administrator|specialist|intern|writer|recruiter|nurse|teacher|director|coordinator|representative|programmer|tester";
+const STOP = new Set(["a", "an", "the", "and", "as", "of", "for", "at", "in", "to", "with", "ui", "my", "i", "am", "was", "worked", "also", "senior", "junior", "lead"]);
 
-const escape = (s: string) => s.replace(/[.+*?^${}()|[\]\\/]/g, "\\$&");
+export function levelFromTitle(title: string): Level | undefined {
+  const t = title.toLowerCase();
+  if (/\b(intern|internship|trainee|apprentice|werkstudent|praktikum)\b/.test(t)) return 0;
+  if (/\b(junior|jr\.?|entry|graduate|associate)\b/.test(t)) return 1;
+  if (/\b(lead|staff|principal|head|director|vp|chief|manager)\b/.test(t)) return 4;
+  if (/\b(senior|sr\.?)\b/.test(t)) return 3;
+  return undefined;
+}
+
+export function levelFromYears(y: number): Level {
+  return y < 1 ? 0 : y < 3 ? 1 : y < 6 ? 2 : y < 10 ? 3 : 4;
+}
 
 export function buildProfile(text: string): Profile {
-  const t = text.toLowerCase();
-  const skills = SKILLS.filter((s) => new RegExp(`(^|[^a-z0-9+#.])${escape(s)}($|[^a-z0-9+#])`).test(t));
-  const titles = new Set<string>();
-  const titleRe = /\b((?:[a-z]+ ){0,2}(?:developer|engineer|designer|analyst|manager|scientist|architect|consultant|marketer|accountant|administrator|specialist|intern|lead))\b/g;
-  for (const m of t.matchAll(titleRe)) {
-    titles.add(m[1].trim());
-    if (titles.size >= 6) break;
+  const skills = findSkills(text);
+
+  const titles: string[] = [];
+  const re = new RegExp(`\\b((?:[a-z][a-z/+.#-]+ ){0,2}(?:${ROLE}))\\b`, "gi");
+  for (const m of text.matchAll(re)) {
+    const words = m[1].toLowerCase().split(" ").filter((w) => !STOP.has(w));
+    const t = words.join(" ");
+    if (words.length && !titles.includes(t) && !/^(the|a)\b/.test(t)) titles.push(t);
+    if (titles.length >= 5) break;
   }
-  const yrs = [...t.matchAll(/(\d{1,2})\+?\s*years?/g)].map((m) => +m[1]).filter((n) => n < 40);
-  return { skills, titles: [...titles], yearsExperience: yrs.length ? Math.max(...yrs) : null };
+
+  const yrs = [...text.matchAll(/(\d{1,2})\+?\s*(?:years?|yrs?)\b(?!\s*old)/gi)].map((m) => +m[1]).filter((n) => n > 0 && n < 40);
+  const years = yrs.length ? Math.max(...yrs) : null;
+
+  const explicit = levelFromTitle(titles.join(" ") + " " + text.slice(0, 300));
+  const level = explicit ?? (years !== null ? levelFromYears(years) : null);
+
+  return { skills, titles, years, level };
 }
