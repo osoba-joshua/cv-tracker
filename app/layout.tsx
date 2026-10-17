@@ -7,6 +7,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  applicationName: "CV Tracker",
+  appleWebApp: { capable: true, title: "CV Tracker", statusBarStyle: "default" },
   title: "CV Tracker – find jobs that fit your CV",
   description: "Upload your CV, get live remote and local job postings ranked by fit, and track your applications.",
 };
@@ -25,6 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen">
+        <a href="#main" className="sr-only fixed left-2 top-2 z-[100] rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-fg focus:not-sr-only">
+          Skip to content
+        </a>
         <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeScript }} />
         {children}
       </body>

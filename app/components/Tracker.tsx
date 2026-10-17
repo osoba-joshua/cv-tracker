@@ -31,7 +31,7 @@ export default function Tracker({
 
   if (!items.length) {
     return (
-      <div className="mx-auto max-w-md px-4 py-24 text-center">
+      <div id="main" className="mx-auto max-w-md px-4 py-24 text-center">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent" aria-hidden>
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
             <path d="M6 3h12v18l-6-4-6 4z" />
@@ -52,7 +52,7 @@ export default function Tracker({
   const progressed = items.filter((i) => i.stage === "interview" || i.stage === "offer").length;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div id="main" className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Application tracker</h1>

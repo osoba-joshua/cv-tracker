@@ -1,15 +1,17 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_LOC, SAMPLE_CV, useDebounced, useLocalStorage, type Loc, type Stage, type Tracked } from "@/lib/client";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { DEFAULT_LOC, SAMPLE_CV, getSeen, markSeen, useDebounced, useLocalStorage, type Loc, type Stage, type Tracked } from "@/lib/client";
 import { countryByCode, countryName, detectCountry } from "@/lib/geo";
+import { haystack } from "@/lib/search";
 import type { Profile, ScoredJob, SearchResponse, UserLocation } from "@/lib/types";
-import Filters, { applyFilters, activeFilterCount, DEFAULT_FILTERS, type FilterState } from "./components/Filters";
+import Filters, { applyFilters, activeFilterCount, DEFAULT_FILTERS, DEFAULT_SAVED, type FilterState, type SavedFilters } from "./components/Filters";
 import Header, { type Tab } from "./components/Header";
 import JobCard from "./components/JobCard";
 import JobDrawer from "./components/JobDrawer";
 import Landing from "./components/Landing";
 import LocationPanel from "./components/LocationPanel";
 import ProfilePanel from "./components/ProfilePanel";
+import Shortcuts from "./components/Shortcuts";
 import Tracker from "./components/Tracker";
 
 const PAGE = 20;
@@ -48,7 +50,24 @@ export default function Home() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [toast, setToast] = useState("");
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [saved, setSaved] = useLocalStorage<SavedFilters>("cvt:filters", DEFAULT_SAVED);
+  const [q, setQ] = useState("");
+  const [onlyNew, setOnlyNew] = useState(false);
+  const filters: FilterState = useMemo(() => ({ ...DEFAULT_FILTERS, ...saved, q, onlyNew }), [saved, q, onlyNew]);
+  const setFilters = useCallback(
+    (f: FilterState) => {
+      const { q: nq, onlyNew: nn, ...rest } = f;
+      setQ(nq);
+      setOnlyNew(nn);
+      setSaved(rest);
+    },
+    [setSaved],
+  );
+  const dq = useDeferredValue(q);
+  const [serverQuery, setServerQuery] = useState("");
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const [help, setHelp] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
@@ -94,9 +113,9 @@ export default function Home() {
 
   // Re-rank whenever the (debounced) profile or location changes. A sequence number drops stale responses.
   const seq = useRef(0);
-  const query = useMemo(() => ({ profile, country: loc.country, city: loc.city }), [profile, loc.country, loc.city]);
+  const query = useMemo(() => ({ profile, country: loc.country, city: loc.city, q: serverQuery }), [profile, loc.country, loc.city, serverQuery]);
   const debounced = useDebounced(query, 450);
-  const runSearch = useCallback(async (p: Profile, where: UserLocation) => {
+  const runSearch = useCallback(async (p: Profile, where: UserLocation, boardQuery = "") => {
     const id = ++seq.current;
     setSearching(true);
     setError("");
@@ -104,13 +123,20 @@ export default function Home() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ skills: p.skills, titles: p.titles, years: p.years, level: p.level, location: where }),
+        body: JSON.stringify({ skills: p.skills, titles: p.titles, years: p.years, level: p.level, location: where, query: boardQuery }),
       });
       const json = await res.json();
       if (id !== seq.current) return;
       if (!res.ok) throw new Error(json.error ?? "Search failed");
+      // Flag jobs we have not shown this person before ("New since your last visit")
+      const ids: string[] = (json.results as ScoredJob[]).map((j) => j.id);
+      const seen = getSeen();
+      const fresh = seen.size ? ids.filter((i) => !seen.has(i)) : [];
+      markSeen(ids);
+      if (fresh.length) setNewIds((prev) => new Set([...prev, ...fresh]));
       setData(json);
       setVisible(PAGE);
+      setActiveIdx(-1);
     } catch (e) {
       if (id === seq.current) setError(e instanceof Error ? e.message : "Search failed");
     } finally {
@@ -121,7 +147,7 @@ export default function Home() {
     const p = debounced.profile;
     // Fetching from our own API when the profile or location changes is a legitimate effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (ready && locSettled && p && (p.skills.length || p.titles.length)) runSearch(p, { country: debounced.country, city: debounced.city });
+    if (ready && locSettled && p && (p.skills.length || p.titles.length || debounced.q)) runSearch(p, { country: debounced.country, city: debounced.city }, debounced.q);
   }, [debounced, ready, locSettled, runSearch]);
 
   // Optional AI read of the CV (needs a configured free provider)
@@ -178,7 +204,9 @@ export default function Home() {
     setError("");
     setNotice("");
     setSearching(false);
-    setFilters(DEFAULT_FILTERS);
+    setFilters({ ...DEFAULT_FILTERS, sort: saved.sort });
+    setServerQuery("");
+    setNewIds(new Set());
     setTab("discover");
   }
 
@@ -224,7 +252,19 @@ export default function Home() {
   const hide = (id: string) => setHiddenIds((h) => (h.includes(id) ? h : [...h, id]));
 
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
-  const filtered = useMemo(() => (data ? applyFilters(data.results, filters, hiddenSet, loc.abroad || !loc.country) : []), [data, filters, hiddenSet, loc.abroad, loc.country]);
+  const hay = useMemo(() => new Map((data?.results ?? []).map((j) => [j.id, haystack(j)] as const)), [data]);
+  const showAbroad = loc.abroad || !loc.country;
+  const filtered = useMemo(
+    () => (data ? applyFilters(data.results, { ...filters, q: dq }, hiddenSet, showAbroad, newIds, hay) : []),
+    [data, filters, dq, hiddenSet, showAbroad, newIds, hay],
+  );
+  const newCount = useMemo(() => (data?.results ?? []).filter((j) => newIds.has(j.id) && (showAbroad || j.loc !== "abroad")).length, [data, newIds, showAbroad]);
+  const terms = useMemo(
+    () => [...dq.matchAll(/"([^"]+)"|(\S+)/g)].map((m) => m[1] ?? (m[2].startsWith("-") ? "" : m[2])).filter((t) => t.length > 1),
+    [dq],
+  );
+  const shown = filtered.slice(0, visible);
+  const active = activeIdx < shown.length ? activeIdx : -1;
   const counts = useMemo(() => {
     const c = { local: 0, remote: 0, abroad: 0 };
     for (const j of data?.results ?? []) c[j.loc]++;
@@ -238,15 +278,46 @@ export default function Home() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement;
-      if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(t.tagName)) {
+      if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return;
+      if (selected || help || tab !== "discover" || !profile) return;
+      if (e.key === "/") {
         e.preventDefault();
         searchBox.current?.focus();
+      } else if (e.key === "?") {
+        setHelp(true);
+      } else if (e.key === "j" || e.key === "k") {
+        e.preventDefault();
+        setActiveIdx((i) => (e.key === "j" ? Math.min(i + 1, shown.length - 1) : Math.max(i - 1, 0)));
+      } else if (active >= 0) {
+        const j = shown[active];
+        if (e.key === "Enter" || e.key === "o") setSelected(j.id);
+        else if (e.key === "s") save(j);
+        else if (e.key === "x") hide(j.id);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+    // save/hide only call state setters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, help, tab, profile, shown, active]);
+
+  useEffect(() => {
+    if (active >= 0) document.querySelector(`[data-idx="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  // Removable chips for every active filter
+  const chips: { label: string; clear: () => void }[] = [];
+  const upd = (patch: Partial<FilterState>) => setFilters({ ...filters, ...patch });
+  if (filters.remote) chips.push({ label: "Remote only", clear: () => upd({ remote: false }) });
+  if (filters.minScore) chips.push({ label: `${filters.minScore}%+ match`, clear: () => upd({ minScore: 0 }) });
+  if (filters.posted) chips.push({ label: `Last ${filters.posted === 1 ? "24 hours" : filters.posted + " days"}`, clear: () => upd({ posted: 0 }) });
+  if (filters.salaryOnly) chips.push({ label: "Salary listed", clear: () => upd({ salaryOnly: false }) });
+  if (filters.onlyNew) chips.push({ label: "New only", clear: () => upd({ onlyNew: false }) });
+  if (filters.location) chips.push({ label: `Location: ${filters.location}`, clear: () => upd({ location: "" }) });
+  filters.levels.forEach((l) => chips.push({ label: ["Intern", "Junior", "Mid", "Senior", "Lead+"][l], clear: () => upd({ levels: filters.levels.filter((x) => x !== l) }) }));
+  filters.sources.forEach((s) => chips.push({ label: s, clear: () => upd({ sources: filters.sources.filter((x) => x !== s) }) }));
 
   const trackedList = Object.values(tracked);
 
@@ -276,7 +347,7 @@ export default function Home() {
           aiEnabled={!!ai.enabled}
         />
       ) : (
-        <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <main id="main" className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-4">
             <ProfilePanel
               profile={profile}
@@ -290,7 +361,7 @@ export default function Home() {
             <div className={`space-y-4 ${showFilters ? "block" : "hidden lg:block"}`}>
               <LocationPanel loc={loc} setLoc={setLoc} counts={counts} localSources={data?.localSources} loading={searching} />
               <div className="card p-4">
-                <Filters f={filters} setF={setFilters} sources={data?.sources ?? {}} />
+                <Filters f={filters} setF={setFilters} sources={data?.sources ?? {}} newCount={newCount} />
               </div>
             </div>
           </aside>
@@ -308,8 +379,49 @@ export default function Home() {
                 aria-label="Search results"
                 value={filters.q}
                 onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && q.trim()) {
+                    setServerQuery(q.trim());
+                    setQ("");
+                  } else if (e.key === "Escape") setQ("");
+                }}
               />
             </div>
+            {(serverQuery || (q.trim() && data && filtered.length < 8)) && (
+              <div className="-mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm">
+                {serverQuery && (
+                  <span className="chip chip-accent gap-1.5 !py-1">
+                    Searching the job boards for &quot;{serverQuery}&quot;
+                    <button className="cursor-pointer font-bold" onClick={() => setServerQuery("")} aria-label="Clear board search">
+                      ✕
+                    </button>
+                  </span>
+                )}
+                {q.trim() && !serverQuery && (
+                  <button
+                    className="btn !py-1 text-xs"
+                    onClick={() => {
+                      setServerQuery(q.trim());
+                      setQ("");
+                    }}
+                  >
+                    Not finding it? Search the job boards for &quot;{q.trim()}&quot; ↵
+                  </button>
+                )}
+              </div>
+            )}
+            {chips.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Active filters">
+                {chips.map((c) => (
+                  <button key={c.label} className="chip chip-accent cursor-pointer gap-1 hover:opacity-80" onClick={c.clear} aria-label={`Remove filter ${c.label}`}>
+                    {c.label} <span aria-hidden>✕</span>
+                  </button>
+                ))}
+                <button className="text-xs font-medium text-muted hover:text-fg" onClick={() => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort, q })}>
+                  Clear all
+                </button>
+              </div>
+            )}
 
             {notice && (
               <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
@@ -322,7 +434,7 @@ export default function Home() {
             {error && (
               <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-bad-soft px-4 py-3 text-sm text-bad">
                 {error}
-                <button className="btn !py-1" onClick={() => runSearch(profile, { country: loc.country, city: loc.city })}>
+                <button className="btn !py-1" onClick={() => runSearch(profile, { country: loc.country, city: loc.city }, serverQuery)}>
                   Retry
                 </button>
               </div>
@@ -390,9 +502,9 @@ export default function Home() {
                   </div>
                 ) : (
                   <ul className="space-y-3">
-                    {filtered.slice(0, visible).map((j) => (
+                    {shown.map((j, i) => (
                       <li key={j.id}>
-                        <JobCard job={j} home={loc.country} stage={tracked[j.id]?.stage} onOpen={() => setSelected(j.id)} onSave={() => save(j)} onHide={() => hide(j.id)} />
+                        <JobCard job={j} home={loc.country} terms={terms} isNew={newIds.has(j.id)} active={i === active} index={i} stage={tracked[j.id]?.stage} onOpen={() => setSelected(j.id)} onSave={() => save(j)} onHide={() => hide(j.id)} />
                       </li>
                     ))}
                   </ul>
@@ -415,6 +527,10 @@ export default function Home() {
                     </span>
                   ))}
                   . Every job links to its original posting. Refreshed hourly.
+                  <br />
+                  <button className="mt-1 text-accent hover:underline" onClick={() => setHelp(true)}>
+                    Keyboard shortcuts &amp; search tips (?)
+                  </button>
                 </p>
               </>
             )}
@@ -436,6 +552,8 @@ export default function Home() {
           onSaveNote={(text) => addNote(job, text)}
         />
       )}
+
+      {help && <Shortcuts onClose={() => setHelp(false)} />}
 
       {toast && (
         <div role="status" className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-fg px-4 py-2 text-sm text-bg shadow-lg">

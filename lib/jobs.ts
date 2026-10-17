@@ -64,7 +64,8 @@ function toText(html: string): string {
     .trim();
 }
 
-const fmtMoney = (n: number, cur = "$") => `${cur}${n >= 1000 ? Math.round(n / 1000) + "k" : n}`;
+const fmtMoney = (n: number, cur = "$") =>
+  n >= 1e6 ? `${cur}${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : `${cur}${n >= 1000 ? Math.round(n / 1000) + "k" : n}`;
 const CUR: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CAD: "CA$", AUD: "A$", INR: "₹", NGN: "₦", ZAR: "R", BRL: "R$", PLN: "zł", SGD: "S$", NZD: "NZ$", MXN: "MX$" };
 
 function salaryRange(min?: number | null, max?: number | null, cur = "USD", period = "yearly") {
@@ -285,6 +286,20 @@ async function jooble(keywords: string, location: string): Promise<Job[]> {
       postedAt: j.updated ? new Date(j.updated).toISOString() : undefined,
     }),
   );
+}
+
+/** Finds a job by id in the cached feeds (used to load the full description on demand). */
+export async function findJob(id: string): Promise<Job | undefined> {
+  const prefix = id.split("-")[0];
+  for (const [key, entry] of cache) {
+    if (!key.toLowerCase().startsWith(prefix.slice(0, 5))) continue;
+    const hit = (await entry.data).find((x) => x.id === id);
+    if (hit) return hit;
+  }
+  for (const entry of cache.values()) {
+    const hit = (await entry.data).find((x) => x.id === id);
+    if (hit) return hit;
+  }
 }
 
 /** Which optional local-job providers are configured (shown in the UI so people know how to get more local jobs). */

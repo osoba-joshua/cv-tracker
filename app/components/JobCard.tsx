@@ -5,6 +5,27 @@ import { countryName } from "@/lib/geo";
 import type { ScoredJob } from "@/lib/types";
 import ScoreRing from "./ScoreRing";
 
+const esc = (s: string) => s.replace(/[.*+?^${}()|[]\/]/g, "\export function Logo(");
+
+/** Wraps search terms in <mark> so you can see why a result matched. */
+export function Hi({ text, terms }: { text: string; terms: string[] }) {
+  if (!terms.length) return <>{text}</>;
+  const re = new RegExp(`(${terms.map(esc).join("|")})`, "gi");
+  return (
+    <>
+      {text.split(re).map((p, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="rounded bg-accent-soft px-0.5 text-accent">
+            {p}
+          </mark>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 export function Logo({ job, size = 44 }: { job: Pick<ScoredJob, "logo" | "company">; size?: number }) {
   const [bad, setBad] = useState(false);
   const initials = job.company.replace(/[^\p{L}\p{N} ]/gu, "").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
@@ -24,7 +45,7 @@ export function Logo({ job, size = 44 }: { job: Pick<ScoredJob, "logo" | "compan
   );
 }
 
-export function Meta({ job }: { job: ScoredJob }) {
+export function Meta({ job, terms = [] }: { job: ScoredJob; terms?: string[] }) {
   const bits = [
     job.location,
     job.jobType && job.jobType.replace(/_/g, " "),
@@ -32,7 +53,9 @@ export function Meta({ job }: { job: ScoredJob }) {
   ].filter(Boolean);
   return (
     <p className="mt-0.5 text-sm text-muted">
-      <span className="font-medium text-fg">{job.company}</span>
+      <span className="font-medium text-fg">
+        <Hi text={job.company} terms={terms} />
+      </span>
       {bits.length > 0 && <> · {bits.join(" · ")}</>}
     </p>
   );
@@ -41,6 +64,10 @@ export function Meta({ job }: { job: ScoredJob }) {
 export default function JobCard({
   job,
   home,
+  terms,
+  isNew,
+  active,
+  index,
   stage,
   onOpen,
   onSave,
@@ -48,6 +75,10 @@ export default function JobCard({
 }: {
   job: ScoredJob;
   home: string; // user's country code
+  terms: string[];
+  isNew: boolean;
+  active: boolean;
+  index: number;
   stage?: Stage;
   onOpen: () => void;
   onSave: () => void;
@@ -56,17 +87,18 @@ export default function JobCard({
   const saved = !!stage;
   const homeName = countryName(home);
   return (
-    <article className="card group relative p-4 transition-shadow hover:shadow-md">
+    <article data-idx={index} className={`card group relative p-4 transition-shadow hover:shadow-md ${active ? "ring-2 ring-accent" : ""}`}>
       <div className="flex gap-3">
         <Logo job={job} />
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold leading-snug">
             <button onClick={onOpen} className="cursor-pointer text-left hover:text-accent after:absolute after:inset-0 after:content-['']">
-              {job.title}
+              <Hi text={job.title} terms={terms} />
             </button>
           </h3>
-          <Meta job={job} />
+          <Meta job={job} terms={terms} />
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {isNew && <span className="chip !border-transparent !bg-accent !text-accent-fg">New</span>}
             {job.loc === "local" && homeName && <span className="chip chip-good">In {homeName}</span>}
             {job.loc === "abroad" && homeName && <span className="chip chip-warn">Outside {homeName}</span>}
             {job.remote && <span className="chip chip-accent">Remote</span>}
@@ -75,7 +107,7 @@ export default function JobCard({
             <span className="chip">{job.source}</span>
           </div>
         </div>
-        <ScoreRing score={job.score} />
+        <ScoreRing score={job.score} none={job.matched.length === 0} />
       </div>
 
       {(job.matched.length > 0 || job.missing.length > 0) && (

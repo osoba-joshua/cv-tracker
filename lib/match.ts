@@ -1,12 +1,14 @@
 import { classify } from "./geo";
 import { SOFT_SKILLS } from "./skills";
+import { normText } from "./text";
 import type { Job, Profile, ScoredJob, UserLocation } from "./types";
 
 const ROLE_WORDS = /developer|engineer|designer|analyst|manager|scientist|architect|consultant|marketer|accountant|writer|recruiter|specialist/;
 
-export function scoreJob(job: Job, p: Profile, user: UserLocation): ScoredJob | null {
+export function scoreJob(job: Job, p: Profile, user: UserLocation, relaxed = false): ScoredJob | null {
   const mine = new Set(p.skills.map((s) => s.toLowerCase()));
   const titleLc = job.title.toLowerCase();
+  const titleN = normText(job.title); // spelling-insensitive, for role comparison
   const tagsLc = job.tags.join(" ").toLowerCase();
 
   const weight = (skill: string) => {
@@ -24,21 +26,22 @@ export function scoreJob(job: Job, p: Profile, user: UserLocation): ScoredJob | 
 
   // Title / role fit
   let titleFit = 0;
-  for (const t of p.titles) {
+  for (const raw of p.titles) {
+    const t = normText(raw);
     const words = t.split(" ").filter((w) => w.length > 2);
     if (!words.length) continue;
-    if (titleLc.includes(t) && words.length > 1) titleFit = Math.max(titleFit, 1);
-    else if (words.length > 1 && words.every((w) => titleLc.includes(w))) titleFit = Math.max(titleFit, 0.7);
+    if (titleN.includes(t) && words.length > 1) titleFit = Math.max(titleFit, 1);
+    else if (words.length > 1 && words.every((w) => titleN.includes(w))) titleFit = Math.max(titleFit, 0.7);
     else {
       const role = words.find((w) => ROLE_WORDS.test(w));
-      if (role && titleLc.includes(role)) titleFit = Math.max(titleFit, 0.35);
+      if (role && titleN.includes(role)) titleFit = Math.max(titleFit, 0.35);
     }
   }
 
   const hard = matched.filter((s) => !SOFT_SKILLS.has(s));
   const inTitle = hard.some((s) => titleLc.includes(s.toLowerCase()));
   // Need real evidence: a core skill in the title, 2+ core skills, or a strong title match.
-  if (!inTitle && hard.length < 2 && titleFit < 0.7) return null;
+  if (!relaxed && !inTitle && hard.length < 2 && titleFit < 0.7) return null;
 
   const jobWeight = job.skills.reduce((n, s) => n + weight(s), 0) || 1;
   const gotWeight = matched.reduce((n, s) => n + weight(s), 0);
@@ -68,9 +71,9 @@ export function scoreJob(job: Job, p: Profile, user: UserLocation): ScoredJob | 
   };
 }
 
-export function rank(jobs: Job[], p: Profile, user: UserLocation): ScoredJob[] {
+export function rank(jobs: Job[], p: Profile, user: UserLocation, relaxed = false): ScoredJob[] {
   const scored = jobs
-    .map((j) => scoreJob(j, p, user))
+    .map((j) => scoreJob(j, p, user, relaxed))
     .filter((j): j is ScoredJob => j !== null)
     .sort((a, b) => b.score - a.score);
   // Keep room for jobs you can actually take: abroad jobs can't crowd them out.

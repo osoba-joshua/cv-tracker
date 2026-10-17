@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STAGES, type Stage } from "@/lib/client";
 import type { ScoredJob } from "@/lib/types";
 import { LEVEL_NAMES } from "@/lib/types";
@@ -7,6 +7,9 @@ import { countryName } from "@/lib/geo";
 import AiAssistant from "./AiAssistant";
 import { Logo, Meta } from "./JobCard";
 import ScoreRing, { scoreLabel } from "./ScoreRing";
+
+// Full descriptions are fetched when a job is opened (the list only carries a short excerpt).
+const descMemo = new Map<string, string>();
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
@@ -55,11 +58,49 @@ export default function JobDrawer({
   onSaveNote: (text: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState<{ id: string; text: string } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const done = (text: string) => live && setFull({ id: job.id, text });
+    const hit = descMemo.get(job.id);
+    if (hit) {
+      Promise.resolve().then(() => done(hit));
+    } else {
+      fetch(`/api/job?id=${encodeURIComponent(job.id)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.description) descMemo.set(job.id, j.description);
+          done(j?.description ?? job.description);
+        })
+        .catch(() => done(job.description));
+    }
+    return () => {
+      live = false;
+    };
+  }, [job.id, job.description]);
+  const loadingFull = full?.id !== job.id;
+  const description = full?.id === job.id ? full.text : job.description;
+  const fullJob = useMemo(() => ({ ...job, description }), [job, description]);
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onClose();
+      if (e.key !== "Tab" || !ref.current) return;
+      const items = [...ref.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),select,textarea,input,[tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -103,9 +144,9 @@ export default function JobDrawer({
 
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
           <section className="card flex items-center gap-4 p-4">
-            <ScoreRing score={job.score} size={72} />
+            <ScoreRing score={job.score} size={72} none={job.matched.length === 0} />
             <div>
-              <p className="font-semibold">{scoreLabel(job.score)}</p>
+              <p className="font-semibold">{job.matched.length === 0 ? "Outside your CV" : scoreLabel(job.score)}</p>
               <p className="text-sm text-muted">
                 You have {job.matched.length} of the {job.skills.length || job.matched.length} skills this posting mentions ({pct}%).
               </p>
@@ -140,14 +181,15 @@ export default function JobDrawer({
             </p>
           )}
 
-          <AiAssistant job={job} cv={cv} enabled={ai.enabled} providers={ai.providers} onSaveNote={onSaveNote} />
+          <AiAssistant job={fullJob} cv={cv} enabled={ai.enabled} providers={ai.providers} onSaveNote={onSaveNote} />
 
           <section>
             <h3 className="label">Description</h3>
+            {loadingFull && description.length >= 290 && <p className="mb-2 text-xs text-muted">Loading the full description…</p>}
             <div className="whitespace-pre-line text-[15px] leading-relaxed">
-              {job.description ? <Highlighted text={job.description} matched={job.matched} missing={job.missing} /> : <span className="text-muted">No description provided. Open the original posting for details.</span>}
+              {description ? <Highlighted text={description} matched={job.matched} missing={job.missing} /> : <span className="text-muted">No description provided. Open the original posting for details.</span>}
             </div>
-            {job.description.length >= 3900 && <p className="mt-2 text-xs text-muted">Description shortened. See the full posting on {job.source}.</p>}
+            {description.length >= 3900 && <p className="mt-2 text-xs text-muted">Description shortened. See the full posting on {job.source}.</p>}
           </section>
         </div>
 

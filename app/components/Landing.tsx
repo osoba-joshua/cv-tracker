@@ -27,7 +27,7 @@ export default function Landing({
   const [text, setText] = useState("");
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-20 pt-12 sm:pt-20">
+    <div id="main" className="mx-auto max-w-3xl px-4 pb-20 pt-12 sm:pt-20">
       <div className="text-center">
         <span className="chip chip-accent">Free · no account · your CV stays on your device</span>
         <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">

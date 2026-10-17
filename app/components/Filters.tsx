@@ -1,5 +1,6 @@
 "use client";
 import { ageDays } from "@/lib/client";
+import { isEmptyQuery, matches, parseQuery } from "@/lib/search";
 import { LEVEL_NAMES, type ScoredJob } from "@/lib/types";
 
 export type FilterState = {
@@ -9,6 +10,7 @@ export type FilterState = {
   sources: string[]; // empty = all
   posted: 0 | 1 | 7 | 30; // 0 = any
   salaryOnly: boolean;
+  onlyNew: boolean;
   levels: number[]; // empty = all
   location: string;
   sort: "match" | "newest" | "salary";
@@ -16,6 +18,20 @@ export type FilterState = {
 
 export const DEFAULT_FILTERS: FilterState = {
   q: "",
+  remote: false,
+  minScore: 0,
+  sources: [],
+  posted: 0,
+  salaryOnly: false,
+  onlyNew: false,
+  levels: [],
+  location: "",
+  sort: "match",
+};
+
+/** The part of the filters that is remembered between visits. */
+export type SavedFilters = Omit<FilterState, "q" | "onlyNew">;
+export const DEFAULT_SAVED: SavedFilters = {
   remote: false,
   minScore: 0,
   sources: [],
@@ -29,12 +45,20 @@ export const DEFAULT_FILTERS: FilterState = {
 export function activeFilterCount(f: FilterState) {
   return (
     (f.q ? 1 : 0) + (f.remote ? 1 : 0) + (f.minScore ? 1 : 0) + (f.sources.length ? 1 : 0) +
-    (f.posted ? 1 : 0) + (f.salaryOnly ? 1 : 0) + (f.levels.length ? 1 : 0) + (f.location ? 1 : 0)
+    (f.posted ? 1 : 0) + (f.salaryOnly ? 1 : 0) + (f.onlyNew ? 1 : 0) + (f.levels.length ? 1 : 0) + (f.location ? 1 : 0)
   );
 }
 
-export function applyFilters(jobs: ScoredJob[], f: FilterState, hidden: Set<string>, showAbroad: boolean): ScoredJob[] {
-  const q = f.q.trim().toLowerCase();
+export function applyFilters(
+  jobs: ScoredJob[],
+  f: FilterState,
+  hidden: Set<string>,
+  showAbroad: boolean,
+  newIds: Set<string>,
+  hay: Map<string, string>,
+): ScoredJob[] {
+  const query = parseQuery(f.q);
+  const hasQuery = !isEmptyQuery(query);
   const loc = f.location.trim().toLowerCase();
   const out = jobs.filter((j) => {
     if (hidden.has(j.id)) return false;
@@ -44,9 +68,10 @@ export function applyFilters(jobs: ScoredJob[], f: FilterState, hidden: Set<stri
     if (f.sources.length && !f.sources.includes(j.source)) return false;
     if (f.posted && ageDays(j.postedAt) > f.posted) return false;
     if (f.salaryOnly && !j.salary) return false;
+    if (f.onlyNew && !newIds.has(j.id)) return false;
     if (f.levels.length && !(j.level !== undefined ? f.levels.includes(j.level) : f.levels.includes(2))) return false;
     if (loc && !j.location.toLowerCase().includes(loc)) return false;
-    if (q && !`${j.title} ${j.company} ${j.tags.join(" ")}`.toLowerCase().includes(q)) return false;
+    if (hasQuery && !matches(hay.get(j.id) ?? "", query)) return false;
     return true;
   });
   if (f.sort === "newest") out.sort((a, b) => +new Date(b.postedAt ?? 0) - +new Date(a.postedAt ?? 0));
@@ -86,10 +111,12 @@ export default function Filters({
   f,
   setF,
   sources,
+  newCount,
 }: {
   f: FilterState;
   setF: (f: FilterState) => void;
   sources: Record<string, number>;
+  newCount: number;
 }) {
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => setF({ ...f, [k]: v });
   const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
@@ -145,6 +172,11 @@ export default function Filters({
         <Toggle checked={f.salaryOnly} onChange={(v) => set("salaryOnly", v)}>
           Salary listed
         </Toggle>
+        {newCount > 0 && (
+          <Toggle checked={f.onlyNew} onChange={(v) => set("onlyNew", v)}>
+            New since your last visit <span className="chip chip-accent ml-1">{newCount}</span>
+          </Toggle>
+        )}
       </div>
 
       <div>

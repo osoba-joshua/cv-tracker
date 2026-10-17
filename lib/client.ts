@@ -52,6 +52,22 @@ export function timeAgo(iso?: string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/** Job ids the user has already been shown, so we can flag what is new on their next visit. */
+export function getSeen(): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem("cvt:seen") || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+export function markSeen(ids: string[]) {
+  try {
+    const s = getSeen();
+    ids.forEach((i) => s.add(i));
+    localStorage.setItem("cvt:seen", JSON.stringify([...s].slice(-4000)));
+  } catch {}
+}
+
 export const ageDays = (iso?: string) => (iso ? (Date.now() - new Date(iso).getTime()) / 864e5 : Infinity);
 
 export type Stage = "saved" | "applied" | "interview" | "offer" | "rejected";

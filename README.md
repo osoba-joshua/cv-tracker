@@ -9,7 +9,11 @@ Upload your CV and get live job postings ranked by how well they fit you, filter
 - **Ranked matches.** Every job gets a 0-100 score, the skills you have, and the gaps to close.
 - **Live jobs** from Remote OK, Remotive, Jobicy, Himalayas, Working Nomads and Arbeitnow. Duplicates across boards are merged. Optional Jooble and Adzuna keys add local on-site jobs.
 - **Free AI tools** (optional): smarter CV reading, an honest fit check, a tailored cover letter, likely interview questions with answer tips, and CV tailoring. Works with free Gemini, Groq, OpenRouter or a local Ollama.
-- **Filters**: remote only, minimum match, salary listed, posted within, location, level, source and search. Sort by match, newest or salary.
+- **Smart search**: type `react developer` (both words), `"product manager"` (exact phrase) or `-senior` (exclude). Spelling variants match (`front-end` = `frontend`, `developer` = `engineer`). Press Enter to search the job boards for anything, even outside your CV.
+- **Filters**: remote only, minimum match, salary listed, posted within, location, level, source and "new since your last visit". Active filters show as removable chips and are remembered. Sort by match, newest or salary.
+- **Fast**: job lists are lightweight (full descriptions load when you open a job) and feeds are cached.
+- **Keyboard friendly**: `j`/`k` move between jobs, `Enter` opens, `s` saves, `x` hides, `/` searches, `?` shows help.
+- **Installable**: add it to your phone or desktop home screen (it ships a web app manifest).
 - **Application tracker**: Saved, Applied, Interviewing, Offer, Rejected. Drag cards between columns, add notes, set follow-up reminders, export to CSV.
 - **Light and dark themes**, keyboard shortcuts (`/` to search, `Esc` to close), and a mobile layout.
 
@@ -74,7 +78,8 @@ The UI uses these JSON endpoints, so other clients (for example a mobile app) ca
 | Endpoint | Body | Returns |
 | --- | --- | --- |
 | `POST /api/parse` | multipart field `cv`, or JSON `{ "text": "..." }` | `{ profile, text }` |
-| `POST /api/search` | JSON `{ skills, titles, years, level, location: { country, city } }` | `{ total, sources, localSources, results }` |
+| `POST /api/search` | JSON `{ skills, titles, years, level, location: { country, city }, query? }` | `{ total, sources, localSources, results }` |
+| `GET /api/job?id=...` | | `{ description }` (full text of a cached job) |
 | `GET /api/ai/status` | | `{ enabled, providers }` |
 | `POST /api/ai/profile` | JSON `{ text }` | `{ profile, provider }` |
 | `POST /api/ai/job` | JSON `{ task: "fit" \| "cover" \| "prep" \| "tweak", cv, job, tone? }` | `{ result, provider }` |
