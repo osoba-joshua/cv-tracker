@@ -73,10 +73,12 @@ export default function ProfilePanel({
   profile,
   onChange,
   loading,
+  ai,
 }: {
   profile: Profile;
   onChange: (p: Profile) => void;
   loading: boolean;
+  ai?: { available: boolean; reading: boolean; onRead: () => void };
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -99,6 +101,12 @@ export default function ProfilePanel({
           {open ? "Hide" : "Edit"}
         </button>
       </div>
+      {profile.summary && (
+        <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-xs leading-relaxed">
+          <span className="font-semibold text-accent">AI read: </span>
+          {profile.summary}
+        </p>
+      )}
       {open && (
         <div className="mt-4 space-y-4">
           <ChipInput
@@ -134,6 +142,11 @@ export default function ProfilePanel({
               ))}
             </select>
           </div>
+          {ai?.available && (
+            <button className="btn w-full text-xs" disabled={ai.reading} onClick={ai.onRead}>
+              {ai.reading ? "AI is reading your CV…" : profile.summary ? "Re-read CV with AI" : "Improve with AI"}
+            </button>
+          )}
           <p className="text-xs text-muted">Changes re-rank jobs instantly. Your CV itself is never uploaded again or stored.</p>
         </div>
       )}

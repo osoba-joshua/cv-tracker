@@ -7,7 +7,14 @@ export type Profile = {
   titles: string[];
   years: number | null;
   level: Level | null;
+  // Filled in when the optional AI reads the CV
+  summary?: string;
+  strengths?: string[];
 };
+
+export type JobGeo = { worldwide: boolean; countries: string[]; regions: string[] };
+
+export type UserLocation = { country: string; city: string };
 
 export type Job = {
   id: string;
@@ -27,9 +34,11 @@ export type Job = {
   salaryMax?: number; // yearly, for sorting
   postedAt?: string;
   level?: Level;
+  geo: JobGeo;
 };
 
 export type ScoredJob = Job & {
+  loc: "local" | "remote" | "abroad";
   score: number;
   matched: string[];
   missing: string[];
@@ -37,6 +46,7 @@ export type ScoredJob = Job & {
 
 export type SearchResponse = {
   total: number;
+  localSources: { adzuna: boolean; jooble: boolean };
   results: ScoredJob[];
   sources: Record<string, number>;
 };

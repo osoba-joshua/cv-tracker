@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { STAGES, type Stage } from "@/lib/client";
 import type { ScoredJob } from "@/lib/types";
 import { LEVEL_NAMES } from "@/lib/types";
+import { countryName } from "@/lib/geo";
+import AiAssistant from "./AiAssistant";
 import { Logo, Meta } from "./JobCard";
 import ScoreRing, { scoreLabel } from "./ScoreRing";
 
@@ -31,18 +33,26 @@ function Highlighted({ text, matched, missing }: { text: string; matched: string
 
 export default function JobDrawer({
   job,
+  home,
+  cv,
+  ai,
   stage,
   onClose,
   onSave,
   onStage,
   onHide,
+  onSaveNote,
 }: {
   job: ScoredJob;
+  home: string;
+  cv: string;
+  ai: { enabled: boolean | null; providers: string[] };
   stage?: Stage;
   onClose: () => void;
   onSave: () => void;
   onStage: (s: Stage) => void;
   onHide: () => void;
+  onSaveNote: (text: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -123,6 +133,14 @@ export default function JobDrawer({
               <p className="mt-2 text-xs text-muted">Mentioned in the posting but not on your profile. If you have them, add them under Your profile.</p>
             </section>
           )}
+
+          {job.loc === "abroad" && (
+            <p className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
+              This job is based outside {countryName(home) || "your country"} ({job.location}). Check visa, relocation or remote eligibility before you apply.
+            </p>
+          )}
+
+          <AiAssistant job={job} cv={cv} enabled={ai.enabled} providers={ai.providers} onSaveNote={onSaveNote} />
 
           <section>
             <h3 className="label">Description</h3>

@@ -68,15 +68,22 @@ export type Tracked = {
   job: Omit<ScoredJob, "description">;
   stage: Stage;
   note: string;
+  followUp?: string; // YYYY-MM-DD reminder
   savedAt: string;
   updatedAt: string;
 };
 
+export const isDue = (t: Tracked) => !!t.followUp && t.stage !== "rejected" && t.stage !== "offer" && t.followUp <= new Date().toISOString().slice(0, 10);
+
+/** Where the user is based and whether to show jobs outside that country. */
+export type Loc = { country: string; city: string; abroad: boolean; manual: boolean };
+export const DEFAULT_LOC: Loc = { country: "", city: "", abroad: false, manual: false };
+
 export function toCsv(items: Tracked[]): string {
   const esc = (s: string) => `"${String(s ?? "").replace(/"/g, '""')}"`;
-  const rows = [["Title", "Company", "Stage", "Match", "Location", "Salary", "Source", "Link", "Saved", "Note"]];
+  const rows = [["Title", "Company", "Stage", "Match", "Location", "Salary", "Source", "Link", "Saved", "Follow up", "Note"]];
   for (const t of items) {
-    rows.push([t.job.title, t.job.company, t.stage, `${t.job.score}%`, t.job.location, t.job.salary ?? "", t.job.source, t.job.url, t.savedAt.slice(0, 10), t.note]);
+    rows.push([t.job.title, t.job.company, t.stage, `${t.job.score}%`, t.job.location, t.job.salary ?? "", t.job.source, t.job.url, t.savedAt.slice(0, 10), t.followUp ?? "", t.note]);
   }
   return rows.map((r) => r.map(esc).join(",")).join("\n");
 }

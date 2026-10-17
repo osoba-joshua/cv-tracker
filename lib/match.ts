@@ -1,9 +1,10 @@
+import { classify } from "./geo";
 import { SOFT_SKILLS } from "./skills";
-import type { Job, Profile, ScoredJob } from "./types";
+import type { Job, Profile, ScoredJob, UserLocation } from "./types";
 
 const ROLE_WORDS = /developer|engineer|designer|analyst|manager|scientist|architect|consultant|marketer|accountant|writer|recruiter|specialist/;
 
-export function scoreJob(job: Job, p: Profile): ScoredJob | null {
+export function scoreJob(job: Job, p: Profile, user: UserLocation): ScoredJob | null {
   const mine = new Set(p.skills.map((s) => s.toLowerCase()));
   const titleLc = job.title.toLowerCase();
   const tagsLc = job.tags.join(" ").toLowerCase();
@@ -53,18 +54,27 @@ export function scoreJob(job: Job, p: Profile): ScoredJob | null {
     else if (gap === 1) score *= 0.92;
   }
 
+  const loc = classify(job, user);
+  let pct = Math.round(score * 100);
+  if (loc === "local") pct += 6; // jobs in your own country rank a little higher
+  if (loc === "abroad") pct -= 3;
+
   return {
     ...job,
+    loc,
     matched: [...new Set(matched)],
     missing: missing.slice(0, 8),
-    score: Math.max(1, Math.min(99, Math.round(score * 100))),
+    score: Math.max(1, Math.min(99, pct)),
   };
 }
 
-export function rank(jobs: Job[], p: Profile, limit = 150): ScoredJob[] {
-  return jobs
-    .map((j) => scoreJob(j, p))
+export function rank(jobs: Job[], p: Profile, user: UserLocation): ScoredJob[] {
+  const scored = jobs
+    .map((j) => scoreJob(j, p, user))
     .filter((j): j is ScoredJob => j !== null)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  // Keep room for jobs you can actually take: abroad jobs can't crowd them out.
+  const near = scored.filter((j) => j.loc !== "abroad").slice(0, 170);
+  const abroad = scored.filter((j) => j.loc === "abroad").slice(0, 60);
+  return [...near, ...abroad].sort((a, b) => b.score - a.score);
 }

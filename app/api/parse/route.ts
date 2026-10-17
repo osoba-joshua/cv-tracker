@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     if (text.trim().length < 30) {
       return Response.json({ error: "Couldn't read any text from that CV. Try a text-based PDF or paste it in." }, { status: 400 });
     }
-    return Response.json({ profile: buildProfile(text) });
+    return Response.json({ profile: buildProfile(text), text });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Something went wrong" }, { status: 500 });
   }

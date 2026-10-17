@@ -1,6 +1,7 @@
-import { fetchJobs } from "@/lib/jobs";
+import { countryByCode } from "@/lib/geo";
+import { fetchJobs, localSourcesConfigured } from "@/lib/jobs";
 import { rank } from "@/lib/match";
-import type { Level, Profile, SearchResponse } from "@/lib/types";
+import type { Level, Profile, SearchResponse, UserLocation } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -8,7 +9,7 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max
 const strs = (v: unknown, n: number, max: number) =>
   Array.isArray(v) ? v.map((x) => str(x, max).trim()).filter(Boolean).slice(0, n) : [];
 
-// POST JSON profile {skills, titles, years, level} -> ranked jobs
+// POST JSON {skills, titles, years, level, location: {country, city}} -> ranked jobs
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -22,15 +23,17 @@ export async function POST(req: Request) {
     if (!profile.skills.length && !profile.titles.length) {
       return Response.json({ error: "Add at least one skill or role to search." }, { status: 400 });
     }
+    const code = str(body.location?.country, 2).toUpperCase();
+    const user: UserLocation = { country: countryByCode(code) ? code : "", city: str(body.location?.city, 60) };
 
     const terms = [...profile.titles.slice(0, 2), ...profile.skills.slice(0, 2).map((s) => s.toLowerCase())];
-    const jobs = await fetchJobs(terms.length ? terms : ["developer"]);
-    const results = rank(jobs, profile);
+    const jobs = await fetchJobs(terms.length ? terms : ["developer"], user);
+    const results = rank(jobs, profile, user);
 
     const sources: Record<string, number> = {};
     for (const j of jobs) sources[j.source] = (sources[j.source] ?? 0) + 1;
 
-    const res: SearchResponse = { total: jobs.length, results, sources };
+    const res: SearchResponse = { total: jobs.length, localSources: localSourcesConfigured(), results, sources };
     return Response.json(res);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Something went wrong" }, { status: 500 });

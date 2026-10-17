@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { CountrySelect } from "./LocationPanel";
 
 export default function Landing({
   busy,
@@ -7,12 +8,18 @@ export default function Landing({
   onFile,
   onText,
   onSample,
+  country,
+  onCountry,
+  aiEnabled,
 }: {
   busy: boolean;
   error: string;
   onFile: (f: File) => void;
   onText: (t: string) => void;
   onSample: () => void;
+  country: string;
+  onCountry: (c: string) => void;
+  aiEnabled: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -22,7 +29,7 @@ export default function Landing({
   return (
     <div className="mx-auto max-w-3xl px-4 pb-20 pt-12 sm:pt-20">
       <div className="text-center">
-        <span className="chip chip-accent">Free · no account · your CV is never stored</span>
+        <span className="chip chip-accent">Free · no account · your CV stays on your device</span>
         <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">
           Find the jobs that <span className="text-accent">actually fit</span> your CV
         </h1>
@@ -31,7 +38,14 @@ export default function Landing({
         </p>
       </div>
 
-      <div className="mt-10">
+      <div className="mx-auto mt-8 flex max-w-sm items-center gap-3">
+        <label htmlFor="home" className="shrink-0 text-sm font-medium">
+          I&apos;m based in
+        </label>
+        <CountrySelect id="home" value={country} onChange={onCountry} />
+      </div>
+
+      <div className="mt-5">
         {!paste ? (
           <div
             onDragOver={(e) => {
@@ -104,6 +118,11 @@ export default function Landing({
             </div>
           </div>
         )}
+        {aiEnabled && (
+          <p className="mt-3 text-center text-xs text-muted">
+            AI is on: your CV text is sent to the AI provider you configured to read it and to power the job tools. Nothing is stored on a server.
+          </p>
+        )}
         {error && (
           <p role="alert" className="mt-4 rounded-lg bg-bad-soft px-4 py-3 text-sm text-bad">
             {error}
@@ -114,7 +133,7 @@ export default function Landing({
       <ol className="mt-14 grid gap-4 sm:grid-cols-3">
         {[
           ["1", "We read your CV", "Skills, roles and seniority are detected. You can edit anything we got wrong."],
-          ["2", "We scan live jobs", "Remote OK, Remotive, Jobicy and Arbeitnow, refreshed hourly."],
+          ["2", "We scan live jobs", "Remote and local boards, filtered to jobs you can actually take from your country."],
           ["3", "You get a ranked list", "See your match score, the skills you have, and the gaps to close."],
         ].map(([n, t, d]) => (
           <li key={n} className="card p-4">

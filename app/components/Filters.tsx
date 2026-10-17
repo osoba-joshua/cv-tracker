@@ -33,11 +33,12 @@ export function activeFilterCount(f: FilterState) {
   );
 }
 
-export function applyFilters(jobs: ScoredJob[], f: FilterState, hidden: Set<string>): ScoredJob[] {
+export function applyFilters(jobs: ScoredJob[], f: FilterState, hidden: Set<string>, showAbroad: boolean): ScoredJob[] {
   const q = f.q.trim().toLowerCase();
   const loc = f.location.trim().toLowerCase();
   const out = jobs.filter((j) => {
     if (hidden.has(j.id)) return false;
+    if (!showAbroad && j.loc === "abroad") return false;
     if (f.remote && !j.remote) return false;
     if (j.score < f.minScore) return false;
     if (f.sources.length && !f.sources.includes(j.source)) return false;
@@ -53,16 +54,27 @@ export function applyFilters(jobs: ScoredJob[], f: FilterState, hidden: Set<stri
   return out; // "match" order is already the server's order
 }
 
-function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+export function Toggle({
+  checked,
+  onChange,
+  children,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
+    <label className={`flex items-center justify-between gap-3 text-sm ${disabled ? "opacity-50" : "cursor-pointer"}`}>
       <span>{children}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${checked ? "bg-accent" : "bg-line"}`}
+        className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed ${checked ? "bg-accent" : "bg-line"}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? "left-[18px]" : "left-0.5"}`} />
       </button>

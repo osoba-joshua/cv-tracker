@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { STAGES, timeAgo, toCsv, type Stage, type Tracked } from "@/lib/client";
+import { STAGES, isDue, timeAgo, toCsv, type Stage, type Tracked } from "@/lib/client";
 import { Logo } from "./JobCard";
 import ScoreRing from "./ScoreRing";
 
@@ -8,12 +8,14 @@ export default function Tracker({
   items,
   setStage,
   setNote,
+  setFollowUp,
   remove,
   goDiscover,
 }: {
   items: Tracked[];
   setStage: (id: string, s: Stage) => void;
   setNote: (id: string, n: string) => void;
+  setFollowUp: (id: string, date: string) => void;
   remove: (id: string) => void;
   goDiscover: () => void;
 }) {
@@ -46,6 +48,7 @@ export default function Tracker({
 
   const count = (s: Stage) => items.filter((i) => i.stage === s).length;
   const applied = items.filter((i) => i.stage !== "saved").length;
+  const due = items.filter(isDue).length;
   const progressed = items.filter((i) => i.stage === "interview" || i.stage === "offer").length;
 
   return (
@@ -55,6 +58,7 @@ export default function Tracker({
           <h1 className="text-2xl font-bold">Application tracker</h1>
           <p className="text-sm text-muted">
             {items.length} tracked · {applied} applied · {applied ? Math.round((progressed / applied) * 100) : 0}% reached interview or offer
+            {due > 0 && <span className="ml-2 font-medium text-bad">· {due} follow-up{due > 1 ? "s" : ""} due</span>}
           </p>
         </div>
         <button className="btn" onClick={exportCsv}>
@@ -123,6 +127,18 @@ export default function Tracker({
                     ) : (
                       t.note && <p className="mt-2 line-clamp-2 rounded bg-bg px-2 py-1 text-xs">{t.note}</p>
                     )}
+                    <div className="mt-2 flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-muted">
+                        Follow up
+                        <input
+                          type="date"
+                          className="input !w-auto !px-1.5 !py-0.5 text-xs"
+                          value={t.followUp ?? ""}
+                          onChange={(e) => setFollowUp(t.job.id, e.target.value)}
+                        />
+                      </label>
+                      {isDue(t) && <span className="chip !border-transparent !bg-bad-soft !text-bad">Due</span>}
+                    </div>
                     <div className="mt-2 flex items-center gap-1">
                       <select
                         className="input !w-auto !py-1 text-xs"

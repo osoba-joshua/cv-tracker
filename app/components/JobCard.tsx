@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { timeAgo, STAGES, type Stage } from "@/lib/client";
+import { countryName } from "@/lib/geo";
 import type { ScoredJob } from "@/lib/types";
 import ScoreRing from "./ScoreRing";
 
@@ -39,18 +40,21 @@ export function Meta({ job }: { job: ScoredJob }) {
 
 export default function JobCard({
   job,
+  home,
   stage,
   onOpen,
   onSave,
   onHide,
 }: {
   job: ScoredJob;
+  home: string; // user's country code
   stage?: Stage;
   onOpen: () => void;
   onSave: () => void;
   onHide: () => void;
 }) {
   const saved = !!stage;
+  const homeName = countryName(home);
   return (
     <article className="card group relative p-4 transition-shadow hover:shadow-md">
       <div className="flex gap-3">
@@ -63,6 +67,8 @@ export default function JobCard({
           </h3>
           <Meta job={job} />
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {job.loc === "local" && homeName && <span className="chip chip-good">In {homeName}</span>}
+            {job.loc === "abroad" && homeName && <span className="chip chip-warn">Outside {homeName}</span>}
             {job.remote && <span className="chip chip-accent">Remote</span>}
             {job.salary && <span className="chip chip-good">{job.salary}</span>}
             {stage && <span className="chip chip-accent">{STAGES.find((s) => s.id === stage)?.label}</span>}
