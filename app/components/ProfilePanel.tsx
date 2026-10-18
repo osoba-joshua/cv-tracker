@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ChevronDown, Sparkles, X } from "lucide-react";
 import { ALL_SKILLS } from "@/lib/skills";
-import { LEVEL_NAMES, type Level, type Profile } from "@/lib/types";
+import { useApp } from "@/lib/store";
+import { LEVEL_NAMES, type Level } from "@/lib/types";
 
 function ChipInput({
   label,
@@ -27,7 +29,7 @@ function ChipInput({
   return (
     <div>
       <span className="label">{label}</span>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-card p-1.5 focus-within:border-accent focus-within:shadow-[0_0_0_4px_var(--accent-ring)]">
         {items.map((s) => (
           <span key={s} className="chip chip-accent gap-1 !pr-1">
             {s}
@@ -36,9 +38,7 @@ function ChipInput({
               aria-label={`Remove ${s}`}
               onClick={() => onChange(items.filter((i) => i !== s))}
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                <path d="M2 2l6 6M8 2l-6 6" />
-              </svg>
+              <X size={10} strokeWidth={3} />
             </button>
           </span>
         ))}
@@ -55,7 +55,7 @@ function ChipInput({
           list={listId}
           placeholder={placeholder}
           aria-label={`Add ${label.toLowerCase()}`}
-          className="min-w-32 flex-1 bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted"
+          className="min-w-28 flex-1 bg-transparent px-1.5 py-1 text-sm outline-none placeholder:text-muted"
         />
         {suggestions && (
           <datalist id={listId}>
@@ -69,70 +69,50 @@ function ChipInput({
   );
 }
 
-export default function ProfilePanel({
-  profile,
-  onChange,
-  loading,
-  ai,
-}: {
-  profile: Profile;
-  onChange: (p: Profile) => void;
-  loading: boolean;
-  ai?: { available: boolean; reading: boolean; onRead: () => void };
-}) {
-  const [open, setOpen] = useState(true);
+/** Editable summary of what we read from the CV. Changes re-rank jobs instantly. */
+export default function ProfilePanel({ defaultOpen = true, idSuffix = "" }: { defaultOpen?: boolean; idSuffix?: string }) {
+  const { profile, setProfile, searching, data, ai, aiReading, aiRead, cvText } = useApp();
+  const [open, setOpen] = useState(defaultOpen);
   useEffect(() => {
     // Start collapsed on small screens so results are visible without scrolling.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (window.innerWidth < 1024) setOpen(false);
-  }, []);
+    if (defaultOpen && window.innerWidth < 1024) setOpen(false);
+  }, [defaultOpen]);
+  if (!profile) return null;
+  const update = (p: Partial<typeof profile>) => setProfile({ ...profile, ...p });
+
   return (
     <section className="card p-4" aria-label="Your profile">
-      <div className="flex items-center justify-between gap-2">
+      <button className="flex w-full cursor-pointer items-center justify-between gap-2 text-left" onClick={() => setOpen(!open)} aria-expanded={open}>
         <div>
           <h2 className="font-semibold">Your profile</h2>
           <p className="text-xs text-muted">
             {profile.skills.length} skills · {profile.titles.length} roles
             {profile.years ? ` · ${profile.years}+ yrs` : ""}
-            {loading && <span className="ml-2 text-accent">updating…</span>}
+            {searching && !!data && <span className="ml-2 text-accent">updating…</span>}
           </p>
         </div>
-        <button className="btn btn-ghost !px-2 text-xs text-muted" onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? "Hide" : "Edit"}
-        </button>
-      </div>
+        <ChevronDown size={18} className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
       {profile.summary && (
-        <p className="mt-3 rounded-lg bg-accent-soft px-3 py-2 text-xs leading-relaxed">
+        <p className="mt-3 rounded-xl bg-accent-soft px-3 py-2 text-xs leading-relaxed">
           <span className="font-semibold text-accent">AI read: </span>
           {profile.summary}
         </p>
       )}
       {open && (
         <div className="mt-4 space-y-4">
-          <ChipInput
-            label="Skills"
-            items={profile.skills}
-            onChange={(skills) => onChange({ ...profile, skills })}
-            placeholder="Add a skill…"
-            suggestions={ALL_SKILLS}
-            listId="skill-list"
-          />
-          <ChipInput
-            label="Roles you want"
-            items={profile.titles}
-            onChange={(titles) => onChange({ ...profile, titles })}
-            placeholder="e.g. frontend developer"
-            listId="title-list"
-          />
+          <ChipInput label="Skills" items={profile.skills} onChange={(skills) => update({ skills })} placeholder="Add a skill…" suggestions={ALL_SKILLS} listId={`skill-list${idSuffix}`} />
+          <ChipInput label="Roles you want" items={profile.titles} onChange={(titles) => update({ titles })} placeholder="e.g. frontend developer" listId={`title-list${idSuffix}`} />
           <div>
-            <label className="label" htmlFor="level">
+            <label className="label" htmlFor={`level${idSuffix}`}>
               Seniority
             </label>
             <select
-              id="level"
+              id={`level${idSuffix}`}
               className="input"
               value={profile.level ?? ""}
-              onChange={(e) => onChange({ ...profile, level: e.target.value === "" ? null : (Number(e.target.value) as Level) })}
+              onChange={(e) => update({ level: e.target.value === "" ? null : (Number(e.target.value) as Level) })}
             >
               <option value="">Any</option>
               {LEVEL_NAMES.map((n, i) => (
@@ -142,12 +122,13 @@ export default function ProfilePanel({
               ))}
             </select>
           </div>
-          {ai?.available && (
-            <button className="btn w-full text-xs" disabled={ai.reading} onClick={ai.onRead}>
-              {ai.reading ? "AI is reading your CV…" : profile.summary ? "Re-read CV with AI" : "Improve with AI"}
+          {ai.enabled && !!cvText && (
+            <button className="btn w-full" disabled={aiReading} onClick={aiRead}>
+              <Sparkles size={15} />
+              {aiReading ? "AI is reading your CV…" : profile.summary ? "Re-read CV with AI" : "Improve with AI"}
             </button>
           )}
-          <p className="text-xs text-muted">Changes re-rank jobs instantly. Your CV itself is never uploaded again or stored.</p>
+          <p className="text-xs text-muted">Changes re-rank jobs instantly. Your CV is never uploaded again or stored on a server.</p>
         </div>
       )}
     </section>

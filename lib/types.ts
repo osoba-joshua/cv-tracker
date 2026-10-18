@@ -42,6 +42,8 @@ export type ScoredJob = Job & {
   score: number;
   matched: string[];
   missing: string[];
+  /** How the score was built (each 0-100). level is null when seniority is unknown. */
+  parts: { skills: number; breadth: number; title: number; level: number | null };
 };
 
 export type SearchResponse = {

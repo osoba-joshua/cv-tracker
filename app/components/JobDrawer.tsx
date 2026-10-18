@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STAGES, type Stage } from "@/lib/client";
-import type { ScoredJob } from "@/lib/types";
-import { LEVEL_NAMES } from "@/lib/types";
+import { Banknote, Bookmark, BookmarkCheck, Briefcase, Clock, EyeOff, ExternalLink, Gauge, Globe, GraduationCap, MapPin, Share2, X } from "lucide-react";
+import { STAGES, timeAgo, type Stage } from "@/lib/client";
 import { countryName } from "@/lib/geo";
+import { useApp } from "@/lib/store";
+import { LEVEL_NAMES, type ScoredJob } from "@/lib/types";
 import AiAssistant from "./AiAssistant";
-import { Logo, Meta } from "./JobCard";
-import ScoreRing, { scoreLabel } from "./ScoreRing";
+import { Logo } from "./JobCard";
+import ScoreRing, { scoreLabel, scoreTone } from "./ScoreRing";
 
 // Full descriptions are fetched when a job is opened (the list only carries a short excerpt).
 const descMemo = new Map<string, string>();
@@ -34,60 +35,77 @@ function Highlighted({ text, matched, missing }: { text: string; matched: string
   );
 }
 
-export default function JobDrawer({
-  job,
-  home,
-  cv,
-  ai,
-  stage,
-  onClose,
-  onSave,
-  onStage,
-  onHide,
-  onSaveNote,
-}: {
-  job: ScoredJob;
-  home: string;
-  cv: string;
-  ai: { enabled: boolean | null; providers: string[] };
-  stage?: Stage;
-  onClose: () => void;
-  onSave: () => void;
-  onStage: (s: Stage) => void;
-  onHide: () => void;
-  onSaveNote: (text: string) => void;
-}) {
+function Bar({ label, value, note }: { label: string; value: number | null; note?: string }) {
+  const v = value ?? 0;
+  const tone = v >= 70 ? "var(--good)" : v >= 40 ? "var(--warn)" : "var(--muted)";
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between text-[13px]">
+        <span className="font-medium">{label}</span>
+        <span className="text-xs text-muted">{value === null ? "Not specified" : note ?? `${v}%`}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value === null ? 0 : Math.max(v, 3)}%`, background: tone }} />
+      </div>
+    </div>
+  );
+}
+
+function Fact({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-surface-2/60 px-3 py-2.5">
+      <Icon size={16} className="mt-0.5 shrink-0 text-muted" />
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</p>
+        <p className="truncate text-sm font-medium first-letter:uppercase">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+type TabId = "overview" | "description" | "ai";
+
+export default function JobDrawer() {
+  const { selected } = useApp();
+  if (!selected) return null;
+  return <DrawerBody key={selected.id} job={selected} />;
+}
+
+function DrawerBody({ job }: { job: ScoredJob }) {
+  const { closeJob, save, setStage, hide, ai, cvText, loc, tracked, addNote, toast } = useApp();
   const ref = useRef<HTMLDivElement>(null);
-  const [full, setFull] = useState<{ id: string; text: string } | null>(null);
+  const [tab, setTab] = useState<TabId>("overview");
+  const [full, setFull] = useState<string | null>(descMemo.get(job.id) ?? null);
+  const stage = tracked[job.id]?.stage;
+  const home = countryName(loc.country);
 
   useEffect(() => {
     let live = true;
-    const done = (text: string) => live && setFull({ id: job.id, text });
-    const hit = descMemo.get(job.id);
-    if (hit) {
-      Promise.resolve().then(() => done(hit));
-    } else {
+    if (!descMemo.has(job.id)) {
       fetch(`/api/job?id=${encodeURIComponent(job.id)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => {
+          const text = j?.description ?? job.description;
           if (j?.description) descMemo.set(job.id, j.description);
-          done(j?.description ?? job.description);
+          if (live) setFull(text);
         })
-        .catch(() => done(job.description));
+        .catch(() => live && setFull(job.description));
     }
     return () => {
       live = false;
     };
   }, [job.id, job.description]);
-  const loadingFull = full?.id !== job.id;
-  const description = full?.id === job.id ? full.text : job.description;
+
+  const loadingFull = full === null;
+  const description = full ?? job.description;
   const fullJob = useMemo(() => ({ ...job, description }), [job, description]);
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") return onClose();
+      if (e.key === "Escape") return closeJob();
       if (e.key !== "Tab" || !ref.current) return;
       const items = [...ref.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),select,textarea,input,[tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
       if (!items.length) return;
@@ -109,115 +127,181 @@ export default function JobDrawer({
       document.body.style.overflow = overflow;
       prev?.focus?.();
     };
-  }, [onClose]);
+  }, [closeJob]);
 
-  const pct = Math.round((job.matched.length / Math.max(job.skills.length || 1, 1)) * 100);
+  async function share() {
+    const data = { title: `${job.title} at ${job.company}`, url: job.url };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(job.url);
+        toast("Link copied to clipboard", { tone: "success" });
+      }
+    } catch {}
+  }
+
+  const locFit = job.loc === "local" ? 100 : job.loc === "remote" ? 80 : 25;
+  const locNote = job.loc === "local" ? `In ${home || "your country"}` : job.loc === "remote" ? "Remote, open to you" : `Outside ${home || "your country"}`;
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "description", label: "Description" },
+    { id: "ai", label: "AI copilot" },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="backdrop absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="backdrop absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={closeJob} />
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={`${job.title} at ${job.company}`}
-        className="drawer relative flex h-full w-full max-w-2xl flex-col bg-bg shadow-2xl outline-none"
+        className="drawer relative flex h-full w-full max-w-2xl flex-col bg-bg outline-none"
+        style={{ boxShadow: "var(--shadow-lg)" }}
       >
-        <div className="flex items-start gap-3 border-b border-line bg-card p-5">
-          <Logo job={job} size={52} />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold leading-snug">{job.title}</h2>
-            <Meta job={job} />
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {job.remote && <span className="chip chip-accent">Remote</span>}
-              {job.salary && <span className="chip chip-good">{job.salary}</span>}
-              {job.level !== undefined && <span className="chip">{LEVEL_NAMES[job.level]}</span>}
-            </div>
-          </div>
-          <button className="btn btn-ghost !px-2" onClick={onClose} aria-label="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-6 overflow-y-auto p-5">
-          <section className="card flex items-center gap-4 p-4">
-            <ScoreRing score={job.score} size={72} none={job.matched.length === 0} />
-            <div>
-              <p className="font-semibold">{job.matched.length === 0 ? "Outside your CV" : scoreLabel(job.score)}</p>
-              <p className="text-sm text-muted">
-                You have {job.matched.length} of the {job.skills.length || job.matched.length} skills this posting mentions ({pct}%).
+        <div className="border-b border-line bg-card px-5 pt-5">
+          <div className="flex items-start gap-3.5">
+            <Logo job={job} size={56} />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold leading-snug tracking-tight">{job.title}</h2>
+              <p className="mt-0.5 text-sm text-muted">
+                <span className="font-medium text-fg-2">{job.company}</span> · {job.location}
               </p>
-            </div>
-          </section>
-
-          {job.matched.length > 0 && (
-            <section>
-              <h3 className="label">Skills you have</h3>
-              <div className="flex flex-wrap gap-1.5">
-                {job.matched.map((s) => (
-                  <span key={s} className="chip chip-good">✓ {s}</span>
-                ))}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {job.remote && <span className="chip chip-accent">Remote</span>}
+                {job.salary && <span className="chip chip-good">{job.salary}</span>}
+                {job.level !== undefined && <span className="chip">{LEVEL_NAMES[job.level]}</span>}
+                <span className="chip">{job.source}</span>
               </div>
-            </section>
-          )}
-          {job.missing.length > 0 && (
-            <section>
-              <h3 className="label">Gaps to close</h3>
-              <div className="flex flex-wrap gap-1.5">
-                {job.missing.map((s) => (
-                  <span key={s} className="chip chip-warn">{s}</span>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-muted">Mentioned in the posting but not on your profile. If you have them, add them under Your profile.</p>
-            </section>
-          )}
-
-          {job.loc === "abroad" && (
-            <p className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
-              This job is based outside {countryName(home) || "your country"} ({job.location}). Check visa, relocation or remote eligibility before you apply.
-            </p>
-          )}
-
-          <AiAssistant job={fullJob} cv={cv} enabled={ai.enabled} providers={ai.providers} onSaveNote={onSaveNote} />
-
-          <section>
-            <h3 className="label">Description</h3>
-            {loadingFull && description.length >= 290 && <p className="mb-2 text-xs text-muted">Loading the full description…</p>}
-            <div className="whitespace-pre-line text-[15px] leading-relaxed">
-              {description ? <Highlighted text={description} matched={job.matched} missing={job.missing} /> : <span className="text-muted">No description provided. Open the original posting for details.</span>}
             </div>
-            {description.length >= 3900 && <p className="mt-2 text-xs text-muted">Description shortened. See the full posting on {job.source}.</p>}
-          </section>
+            <button className="btn btn-ghost btn-icon" onClick={closeJob} aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
+          <div role="tablist" className="-mb-px mt-4 flex gap-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`cursor-pointer border-b-2 px-3 pb-2.5 pt-1 text-sm font-medium transition-colors ${tab === t.id ? "border-accent text-accent" : "border-transparent text-muted hover:text-fg"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="space-y-3 border-t border-line bg-card p-4">
+        <div className="flex-1 overflow-y-auto p-5">
+          {tab === "overview" && (
+            <div className="space-y-6">
+              <section className="card flex items-center gap-4 p-4">
+                <ScoreRing score={job.score} size={84} none={job.matched.length === 0} />
+                <div>
+                  <p className="text-lg font-semibold" style={{ color: job.matched.length ? scoreTone(job.score) : undefined }}>
+                    {job.matched.length === 0 ? "Outside your CV" : scoreLabel(job.score)}
+                  </p>
+                  <p className="text-sm text-muted">
+                    You have {job.matched.length} of the {job.skills.length || job.matched.length} skills this posting mentions.
+                  </p>
+                </div>
+              </section>
+
+              <section aria-label="Why this score">
+                <h3 className="label flex items-center gap-1.5"><Gauge size={13} /> Why this score</h3>
+                <div className="card space-y-3.5 p-4">
+                  <Bar label="Skill coverage" value={job.parts.skills} />
+                  <Bar label="Core skills you have" value={job.parts.breadth} />
+                  <Bar label="Role fit" value={job.parts.title} />
+                  <Bar label="Seniority fit" value={job.parts.level} />
+                  <Bar label="Location" value={locFit} note={locNote} />
+                </div>
+              </section>
+
+              {job.loc === "abroad" && (
+                <p className="rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn">
+                  This job is based outside {home || "your country"} ({job.location}). Check visa, relocation or remote eligibility before you apply.
+                </p>
+              )}
+
+              <section className="grid gap-2 sm:grid-cols-2" aria-label="Job details">
+                <Fact icon={MapPin} label="Location" value={job.location} />
+                <Fact icon={Briefcase} label="Type" value={job.jobType?.replace(/_/g, " ")} />
+                <Fact icon={GraduationCap} label="Level" value={job.level !== undefined ? LEVEL_NAMES[job.level] : undefined} />
+                <Fact icon={Banknote} label="Salary" value={job.salary} />
+                <Fact icon={Clock} label="Posted" value={job.postedAt ? timeAgo(job.postedAt) : undefined} />
+                <Fact icon={Globe} label="Source" value={job.source} />
+              </section>
+
+              {job.matched.length > 0 && (
+                <section>
+                  <h3 className="label">Skills you have</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.matched.map((s) => (
+                      <span key={s} className="chip chip-good">✓ {s}</span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {job.missing.length > 0 && (
+                <section>
+                  <h3 className="label">Gaps to close</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.missing.map((s) => (
+                      <span key={s} className="chip chip-warn">{s}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted">Mentioned in the posting but not on your profile. If you have them, add them under Your profile.</p>
+                </section>
+              )}
+            </div>
+          )}
+
+          {tab === "description" && (
+            <section>
+              {loadingFull && description.length >= 290 && <p className="mb-3 text-xs text-muted">Loading the full description…</p>}
+              <div className="whitespace-pre-line text-[15px] leading-relaxed text-fg-2">
+                {description ? <Highlighted text={description} matched={job.matched} missing={job.missing} /> : <span className="text-muted">No description provided. Open the original posting for details.</span>}
+              </div>
+              {description.length >= 3900 && <p className="mt-3 text-xs text-muted">Description shortened. See the full posting on {job.source}.</p>}
+            </section>
+          )}
+
+          {tab === "ai" && <AiAssistant job={fullJob} cv={cvText} enabled={ai.enabled} providers={ai.providers} onSaveNote={(text) => addNote(job, text)} />}
+        </div>
+
+        <div className="space-y-3 border-t border-line bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="flex flex-wrap items-center gap-2">
-            <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-full whitespace-nowrap sm:w-auto">
-              Apply on {job.source} ↗
+            <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg flex-1 sm:flex-none">
+              Apply on {job.source} <ExternalLink size={16} />
             </a>
-            {stage ? (
-              <select className="input !w-auto" value={stage} onChange={(e) => onStage(e.target.value as Stage)} aria-label="Application stage">
+            <button className={`btn btn-lg ${stage ? "!bg-accent-soft !text-accent" : ""}`} onClick={() => save(job)} aria-pressed={!!stage}>
+              {stage ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
+              <span className="hidden sm:inline">{stage ? "Saved" : "Save"}</span>
+            </button>
+            {stage && (
+              <select className="input !h-11 !w-auto" value={stage} onChange={(e) => setStage(job.id, e.target.value as Stage)} aria-label="Application stage">
                 {STAGES.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
                 ))}
               </select>
-            ) : (
-              <button className="btn" onClick={onSave}>
-                Save to tracker
-              </button>
             )}
-            {stage && (
-              <button className="btn btn-ghost text-muted" onClick={onSave}>
-                Remove
-              </button>
-            )}
-            <button className="btn btn-ghost ml-auto text-muted" onClick={() => { onHide(); onClose(); }}>
-              Not interested
+            <button className="btn btn-ghost btn-lg !px-3" onClick={share} aria-label="Share this job">
+              <Share2 size={17} />
+            </button>
+            <button
+              className="btn btn-ghost btn-lg !px-3 text-muted"
+              onClick={() => {
+                hide(job.id);
+                closeJob();
+              }}
+              aria-label="Hide this job"
+            >
+              <EyeOff size={17} />
             </button>
           </div>
           <p className="text-xs text-muted">

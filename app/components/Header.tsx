@@ -1,70 +1,78 @@
 "use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { BarChart3, Columns3, Command, Compass, FileText, Moon, Search, Settings as Cog, Sun } from "lucide-react";
+import { useApp } from "@/lib/store";
+import Logo from "./Logo";
 
-export type Tab = "discover" | "tracker";
+export const NAV = [
+  { href: "/", label: "Discover", icon: Compass },
+  { href: "/insights", label: "Insights", icon: BarChart3 },
+  { href: "/tracker", label: "Tracker", icon: Columns3 },
+  { href: "/cv", label: "My CV", icon: FileText },
+] as const;
 
-export default function Header({
-  tab,
-  setTab,
-  trackedCount,
-  hasProfile,
-  onReset,
-  theme,
-  toggleTheme,
-}: {
-  tab: Tab;
-  setTab: (t: Tab) => void;
-  trackedCount: number;
-  hasProfile: boolean;
-  onReset: () => void;
-  theme: string;
-  toggleTheme: () => void;
-}) {
-  const tabBtn = (id: Tab, label: string, badge?: number) => (
-    <button
-      onClick={() => setTab(id)}
-      aria-current={tab === id ? "page" : undefined}
-      className={`relative cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-        tab === id ? "bg-accent-soft text-accent" : "text-muted hover:text-fg"
-      }`}
-    >
-      {label}
-      {!!badge && <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-fg">{badge}</span>}
-    </button>
-  );
+export default function Header() {
+  const path = usePathname();
+  const { trackedList, setSettings, setPaletteOpen, newCount, dark } = useApp();
+  const due = trackedList.filter((t) => t.followUp && t.stage !== "rejected" && t.stage !== "offer" && t.followUp <= new Date().toISOString().slice(0, 10)).length;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
+    <header className="glass sticky top-0 z-40 border-b border-line no-print">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4">
-        <button onClick={() => setTab("discover")} className="mr-1 flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap font-semibold sm:mr-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-accent-fg" aria-hidden>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12l5 5L20 7" />
-            </svg>
-          </span>
-          <span className="hidden sm:inline">CV Tracker</span>
-        </button>
-        <nav className="flex items-center gap-1" aria-label="Main">
-          {tabBtn("discover", "Discover")}
-          {tabBtn("tracker", "Tracker", trackedCount)}
+        <Link href="/" className="mr-3 shrink-0 rounded-lg" aria-label="CV Tracker home">
+          <Logo />
+        </Link>
+
+        <nav className="hidden items-center gap-0.5 md:flex" aria-label="Main">
+          {NAV.map(({ href, label, icon: Icon }) => {
+            const active = href === "/" ? path === "/" : path.startsWith(href);
+            const badge = href === "/tracker" ? trackedList.length : href === "/" ? newCount : 0;
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
+                  active ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2 hover:text-fg"
+                }`}
+              >
+                <Icon size={16} strokeWidth={2.2} />
+                {label}
+                {badge > 0 && (
+                  <span className={`rounded-full px-1.5 py-px text-[10px] font-semibold ${href === "/" ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted"}`}>{badge}</span>
+                )}
+                {href === "/tracker" && due > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-bad ring-2 ring-bg" aria-label={`${due} follow-ups due`} />}
+              </Link>
+            );
+          })}
         </nav>
-        <div className="ml-auto flex items-center gap-1">
-          {hasProfile && (
-            <button className="btn btn-ghost whitespace-nowrap !px-2.5 text-muted" onClick={onReset}>
-              New CV
-            </button>
-          )}
-          <button className="btn btn-ghost !px-2.5" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>
-            {theme === "dark" ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
-              </svg>
-            )}
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="hidden h-9 w-64 cursor-pointer items-center gap-2 rounded-xl border border-line bg-card px-3 text-sm text-muted transition-colors hover:border-line-strong lg:flex"
+            aria-label="Open command palette"
+          >
+            <Search size={15} />
+            <span className="flex-1 text-left">Search or jump to…</span>
+            <span className="kbd">
+              <Command size={10} />K
+            </span>
           </button>
+          <button className="btn btn-ghost btn-icon lg:hidden" onClick={() => setPaletteOpen(true)} aria-label="Open command palette">
+            <Search size={18} />
+          </button>
+          <button
+            className="btn btn-ghost btn-icon"
+            onClick={() => setSettings((s) => ({ ...s, theme: dark ? "light" : "dark" }))}
+            aria-label={`Switch to ${dark ? "light" : "dark"} theme`}
+          >
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <Link href="/settings" className={`btn btn-ghost btn-icon ${path === "/settings" ? "!bg-accent-soft !text-accent" : ""}`} aria-label="Settings">
+            <Cog size={18} />
+          </Link>
         </div>
       </div>
     </header>

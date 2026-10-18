@@ -85,6 +85,7 @@ export type Tracked = {
   stage: Stage;
   note: string;
   followUp?: string; // YYYY-MM-DD reminder
+  history?: { stage: Stage; at: string }[]; // every stage the job has been in
   savedAt: string;
   updatedAt: string;
 };
@@ -104,12 +105,27 @@ export function toCsv(items: Tracked[]): string {
   return rows.map((r) => r.map(esc).join(",")).join("\n");
 }
 
-export const SAMPLE_CV = `Alex Morgan — Frontend Developer
-5 years of experience building fast, accessible web apps.
+export const SAMPLE_CV = `Alex Morgan
+Frontend Developer
+alex.morgan@example.com | +1 555 010 0199 | linkedin.com/in/alex-morgan-sample | github.com/alex-morgan-sample
 
-Skills: React, TypeScript, Next.js, Node.js, Tailwind CSS, HTML, CSS, GraphQL, Jest, Git, Figma
-Also: Python, SQL, Docker, CI/CD, Agile teams
+Summary
+Frontend developer with 5 years of experience building fast, accessible web apps in React and TypeScript. Led a design system used by 40+ engineers and cut page load times by 45%.
+
+Skills
+React, TypeScript, Next.js, Node.js, Tailwind CSS, HTML, CSS, GraphQL, Jest, Git, Figma, Python, SQL, Docker, CI/CD, Agile
 
 Experience
-Frontend Developer, Northwind (2022–now): led a React and TypeScript design system, improved Lighthouse scores, mentored 3 junior developers.
-UI Designer, Studio Lark (2020–2022): designed and prototyped product UI in Figma, shipped marketing sites.`;
+Frontend Developer, Northwind Labs (2022 - present)
+- Led a React and TypeScript design system adopted by 6 product teams, reducing UI bugs by 30%
+- Improved Lighthouse performance scores from 62 to 96 by introducing code splitting and image optimization
+- Mentored 3 junior developers and introduced code review guidelines across a team of 12
+- Built a GraphQL data layer that cut API calls per page by 50%
+
+UI Designer and Developer, Studio Lark (2020 - 2022)
+- Designed and prototyped product interfaces in Figma for 15+ clients
+- Shipped 20 marketing sites with Next.js and Tailwind CSS, increasing average conversion by 18%
+- Automated deployments with CI/CD, saving 10 hours per week
+
+Education
+BSc Computer Science, University of Lagos (2016 - 2020)`;

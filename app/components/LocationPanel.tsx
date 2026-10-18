@@ -1,6 +1,8 @@
 "use client";
+import { useId } from "react";
+import { MapPin } from "lucide-react";
 import { COUNTRIES, countryName } from "@/lib/geo";
-import type { Loc } from "@/lib/client";
+import { useApp } from "@/lib/store";
 import { Toggle } from "./Filters";
 
 const SORTED = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name));
@@ -18,50 +20,50 @@ export function CountrySelect({ value, onChange, id }: { value: string; onChange
   );
 }
 
-export default function LocationPanel({
-  loc,
-  setLoc,
-  counts,
-  localSources,
-  loading,
-}: {
-  loc: Loc;
-  setLoc: (l: Loc) => void;
-  counts: { local: number; remote: number; abroad: number };
-  localSources?: { adzuna: boolean; jooble: boolean };
-  loading: boolean;
-}) {
+export default function LocationPanel() {
+  const { loc, setLoc, counts, data, searching } = useApp();
+  const uid = useId();
   const name = countryName(loc.country);
-  const noLocal = !!loc.country && counts.local === 0 && !loading;
-  const hasLocalKey = !!(localSources?.adzuna || localSources?.jooble);
+  const noLocal = !!loc.country && counts.local === 0 && !searching && !!data;
+  const hasLocalKey = !!(data?.localSources.adzuna || data?.localSources.jooble);
 
   return (
     <section className="card p-4" aria-label="Your location">
-      <h2 className="font-semibold">Your location</h2>
+      <h2 className="flex items-center gap-2 font-semibold">
+        <MapPin size={16} className="text-accent" /> Your location
+      </h2>
       <div className="mt-3 space-y-3">
         <div>
-          <label className="label" htmlFor="country">
+          <label className="label" htmlFor={`${uid}-country`}>
             Country
           </label>
-          <CountrySelect id="country" value={loc.country} onChange={(country) => setLoc({ ...loc, country, manual: true })} />
+          <CountrySelect id={`${uid}-country`} value={loc.country} onChange={(country) => setLoc({ ...loc, country, manual: true })} />
         </div>
         <div>
-          <label className="label" htmlFor="city">
-            City <span className="font-normal normal-case text-muted">(optional)</span>
+          <label className="label" htmlFor={`${uid}-city`}>
+            City <span className="font-normal normal-case tracking-normal text-muted">(optional)</span>
           </label>
-          <input id="city" className="input" placeholder="e.g. Lagos" value={loc.city} onChange={(e) => setLoc({ ...loc, city: e.target.value, manual: true })} />
+          <input id={`${uid}-city`} className="input" placeholder="e.g. Lagos" value={loc.city} onChange={(e) => setLoc({ ...loc, city: e.target.value, manual: true })} />
         </div>
         <Toggle checked={loc.abroad} onChange={(abroad) => setLoc({ ...loc, abroad })} disabled={!loc.country}>
           Include jobs outside {name || "my country"}
         </Toggle>
         {loc.country && (
-          <p className="text-xs text-muted">
-            <strong className="text-fg">{counts.local}</strong> in {name} · <strong className="text-fg">{counts.remote}</strong> remote you can take ·{" "}
-            <strong className="text-fg">{counts.abroad}</strong> abroad{loc.abroad ? "" : " (hidden)"}
-          </p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              [counts.local, `In ${name.length > 9 ? "country" : name}`],
+              [counts.remote, "Remote"],
+              [counts.abroad, "Abroad"],
+            ].map(([n, l]) => (
+              <div key={l as string} className="rounded-xl bg-surface-2 px-1 py-2">
+                <p className="text-lg font-semibold tabular-nums leading-tight">{n}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted">{l}</p>
+              </div>
+            ))}
+          </div>
         )}
         {noLocal && !hasLocalKey && (
-          <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs">
+          <p className="rounded-xl bg-accent-soft px-3 py-2 text-xs leading-relaxed">
             No on-site jobs in {name} yet. The free remote boards rarely list them. Add a free Jooble or Adzuna key to get local listings (see the README).
           </p>
         )}

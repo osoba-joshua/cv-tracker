@@ -128,3 +128,29 @@ Return JSON: "summary" (a 2-3 sentence professional summary tailored to this job
     },
   };
 }
+
+export type CvReviewAi = { headline: string; strengths: string[]; improvements: string[]; rewrites: { before: string; after: string }[]; keywords: string[] };
+
+export async function aiCvReview(cv: string, targetRoles: string[]): Promise<{ result: CvReviewAi; provider: string }> {
+  const { data, provider } = await askJson(
+    `You are an expert CV reviewer and career coach. ${SAFETY} ${GROUNDING}
+Review the CV for a candidate targeting: ${targetRoles.slice(0, 4).join(", ") || "roles that fit their experience"}.
+Return JSON: "headline" (one honest sentence on the CV's overall state, max 180 chars), "strengths" (up to 4 specific things that work, citing the CV), "improvements" (up to 5 specific, prioritised changes), "rewrites" (up to 4 objects with "before": an actual line copied from the CV and "after": a stronger rewrite that adds NO new facts, only clearer wording, stronger verbs and a placeholder like [X%] where a metric would help), "keywords" (up to 10 keywords for these target roles that the CV supports but does not use prominently).`,
+    `<cv>\n${cv.slice(0, 12000)}\n</cv>`,
+    1500,
+  );
+  const rw = Array.isArray(data.rewrites) ? data.rewrites : [];
+  return {
+    provider,
+    result: {
+      headline: S(data.headline, 220),
+      strengths: A(data.strengths, 4, 240),
+      improvements: A(data.improvements, 5, 260),
+      rewrites: rw
+        .slice(0, 4)
+        .map((x: Record<string, unknown>) => ({ before: S(x?.before, 300), after: S(x?.after, 360) }))
+        .filter((x: { before: string; after: string }) => x.before && x.after),
+      keywords: A(data.keywords, 10, 40),
+    },
+  };
+}

@@ -11,8 +11,14 @@ export default function ScoreRing({ score, size = 48, none = false }: { score: n
   const stroke = size >= 60 ? 6 : 4;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
+  const tone = scoreTone(score);
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={none ? "No skills from your CV found in this job" : `${score} percent match, ${scoreLabel(score)}`}>
+    <div
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={none ? "No skills from your CV found in this job" : `${score} percent match, ${scoreLabel(score)}`}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
         <circle
@@ -20,15 +26,15 @@ export default function ScoreRing({ score, size = 48, none = false }: { score: n
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={scoreTone(score)}
+          stroke={tone}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={none ? c : c * (1 - score / 100)}
-          style={{ transition: "stroke-dashoffset .5s ease" }}
+          style={{ transition: "stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1)", filter: score >= 65 && !none ? `drop-shadow(0 0 3px ${tone})` : undefined }}
         />
       </svg>
-      <span className="absolute inset-0 grid place-items-center font-semibold tabular-nums" style={{ fontSize: size >= 60 ? 18 : 13 }}>
+      <span className="absolute inset-0 grid place-items-center font-semibold tabular-nums" style={{ fontSize: size >= 60 ? 19 : size <= 36 ? 11 : 13 }}>
         {none ? "–" : score}
       </span>
     </div>

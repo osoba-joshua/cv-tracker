@@ -1,12 +1,12 @@
 import { classify } from "./geo";
-import { SOFT_SKILLS } from "./skills";
+import { SOFT_SKILLS, expandSkills } from "./skills";
 import { normText } from "./text";
 import type { Job, Profile, ScoredJob, UserLocation } from "./types";
 
 const ROLE_WORDS = /developer|engineer|designer|analyst|manager|scientist|architect|consultant|marketer|accountant|writer|recruiter|specialist/;
 
 export function scoreJob(job: Job, p: Profile, user: UserLocation, relaxed = false): ScoredJob | null {
-  const mine = new Set(p.skills.map((s) => s.toLowerCase()));
+  const mine = new Set(expandSkills(p.skills).map((s) => s.toLowerCase()));
   const titleLc = job.title.toLowerCase();
   const titleN = normText(job.title); // spelling-insensitive, for role comparison
   const tagsLc = job.tags.join(" ").toLowerCase();
@@ -51,8 +51,10 @@ export function scoreJob(job: Job, p: Profile, user: UserLocation, relaxed = fal
   let score = 0.5 * coverage + 0.3 * breadth + 0.2 * titleFit;
 
   // Seniority mismatch (e.g. a Lead role for a junior CV) lowers the score.
+  let levelFit: number | null = null;
   if (p.level !== null && job.level !== undefined) {
     const gap = Math.abs(p.level - job.level);
+    levelFit = gap === 0 ? 100 : gap === 1 ? 75 : 40;
     if (gap >= 2) score *= 0.75;
     else if (gap === 1) score *= 0.92;
   }
@@ -68,6 +70,7 @@ export function scoreJob(job: Job, p: Profile, user: UserLocation, relaxed = fal
     matched: [...new Set(matched)],
     missing: missing.slice(0, 8),
     score: Math.max(1, Math.min(99, pct)),
+    parts: { skills: Math.round(coverage * 100), breadth: Math.round(breadth * 100), title: Math.round(titleFit * 100), level: levelFit },
   };
 }
 

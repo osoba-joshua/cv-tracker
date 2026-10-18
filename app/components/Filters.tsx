@@ -1,4 +1,5 @@
 "use client";
+import { useId } from "react";
 import { ageDays } from "@/lib/client";
 import { isEmptyQuery, matches, parseQuery } from "@/lib/search";
 import { LEVEL_NAMES, type ScoredJob } from "@/lib/types";
@@ -90,16 +91,18 @@ export function Toggle({
   children: React.ReactNode;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
     <label className={`flex items-center justify-between gap-3 text-sm ${disabled ? "opacity-50" : "cursor-pointer"}`}>
-      <span>{children}</span>
+      <span id={id}>{children}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-labelledby={id}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed ${checked ? "bg-accent" : "bg-line"}`}
+        className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed ${checked ? "bg-accent" : "bg-line-strong"}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? "left-[18px]" : "left-0.5"}`} />
       </button>
@@ -118,26 +121,27 @@ export default function Filters({
   sources: Record<string, number>;
   newCount: number;
 }) {
+  const uid = useId();
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => setF({ ...f, [k]: v });
   const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
-  const n = activeFilterCount(f);
+  const n = activeFilterCount(f) - (f.q ? 1 : 0);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">Filters</h2>
         {n > 0 && (
-          <button className="text-xs font-medium text-accent hover:underline" onClick={() => setF({ ...DEFAULT_FILTERS, sort: f.sort })}>
+          <button className="text-xs font-medium text-accent hover:underline" onClick={() => setF({ ...DEFAULT_FILTERS, sort: f.sort, q: f.q })}>
             Reset ({n})
           </button>
         )}
       </div>
 
       <div>
-        <label className="label" htmlFor="sort">
+        <label className="label" htmlFor={`${uid}-sort`}>
           Sort by
         </label>
-        <select id="sort" className="input" value={f.sort} onChange={(e) => set("sort", e.target.value as FilterState["sort"])}>
+        <select id={`${uid}-sort`} className="input" value={f.sort} onChange={(e) => set("sort", e.target.value as FilterState["sort"])}>
           <option value="match">Best match</option>
           <option value="newest">Newest</option>
           <option value="salary">Highest salary</option>
@@ -146,7 +150,7 @@ export default function Filters({
 
       <div>
         <span className="label">Minimum match</span>
-        <div className="grid grid-cols-3 gap-1 rounded-lg bg-bg p-1" role="radiogroup" aria-label="Minimum match">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="Minimum match">
           {[
             [0, "Any"],
             [45, "45%+"],
@@ -157,7 +161,7 @@ export default function Filters({
               role="radio"
               aria-checked={f.minScore === v}
               onClick={() => set("minScore", v as number)}
-              className={`cursor-pointer rounded-md py-1.5 text-xs font-medium ${f.minScore === v ? "bg-card text-fg shadow-sm" : "text-muted"}`}
+              className={`cursor-pointer rounded-lg py-1.5 text-xs font-medium transition-all ${f.minScore === v ? "bg-card text-fg shadow-sm" : "text-muted hover:text-fg"}`}
             >
               {l}
             </button>
@@ -180,10 +184,10 @@ export default function Filters({
       </div>
 
       <div>
-        <label className="label" htmlFor="posted">
+        <label className="label" htmlFor={`${uid}-posted`}>
           Posted
         </label>
-        <select id="posted" className="input" value={f.posted} onChange={(e) => set("posted", Number(e.target.value) as FilterState["posted"])}>
+        <select id={`${uid}-posted`} className="input" value={f.posted} onChange={(e) => set("posted", Number(e.target.value) as FilterState["posted"])}>
           <option value={0}>Any time</option>
           <option value={1}>Last 24 hours</option>
           <option value={7}>Last 7 days</option>
@@ -192,10 +196,10 @@ export default function Filters({
       </div>
 
       <div>
-        <label className="label" htmlFor="loc">
+        <label className="label" htmlFor={`${uid}-loc`}>
           Location contains
         </label>
-        <input id="loc" className="input" placeholder="e.g. Europe, USA, Berlin" value={f.location} onChange={(e) => set("location", e.target.value)} />
+        <input id={`${uid}-loc`} className="input" placeholder="e.g. Europe, USA, Berlin" value={f.location} onChange={(e) => set("location", e.target.value)} />
       </div>
 
       <div>
@@ -206,7 +210,7 @@ export default function Filters({
               key={name}
               aria-pressed={f.levels.includes(i)}
               onClick={() => set("levels", toggle(f.levels, i))}
-              className={`chip cursor-pointer ${f.levels.includes(i) ? "chip-accent" : "hover:bg-accent-soft"}`}
+              className={`chip cursor-pointer transition-colors ${f.levels.includes(i) ? "chip-accent" : "hover:bg-surface-2"}`}
             >
               {name}
             </button>
