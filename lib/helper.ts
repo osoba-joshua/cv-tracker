@@ -37,9 +37,9 @@ export async function helperPost<T>(path: string, body: unknown, timeoutMs = 60_
   return json as T;
 }
 
-export async function helperGet<T>(path: string): Promise<T> {
+export async function helperGet<T>(path: string, timeoutMs = 15_000): Promise<T> {
   if (!HELPER_URL) throw new HelperError("No helper configured");
-  const r = await httpRequest(`${HELPER_URL}${path}`, { timeoutMs: 15_000 });
+  const r = await httpRequest(`${HELPER_URL}${path}`, { timeoutMs });
   if (!r.ok) throw new HelperError("Request failed");
   return JSON.parse(r.text) as T;
 }

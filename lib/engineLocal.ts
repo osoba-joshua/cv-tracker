@@ -43,11 +43,15 @@ export const localEngine: Engine = {
   stats: () => coreStats(),
   aiStatus: async (keys?: AiKeys) => {
     if (viaHelper(keys)) {
-      try {
-        return await helperGet<{ enabled: boolean; providers: string[] }>("/api/ai/status");
-      } catch {
-        return { enabled: false, providers: [] };
+      // A free host that has gone to sleep needs up to ~a minute to wake, so wait and retry before giving up
+      for (let i = 0; i < 3; i++) {
+        try {
+          return await helperGet<{ enabled: boolean; providers: string[] }>("/api/ai/status", 60_000);
+        } catch {
+          if (i < 2) await new Promise((r) => setTimeout(r, 3000));
+        }
       }
+      return { enabled: false, providers: [] };
     }
     return aiStatus(keys ?? {});
   },
