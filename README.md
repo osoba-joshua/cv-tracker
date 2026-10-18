@@ -161,7 +161,7 @@ There are two ways to build the app, and you can use either:
 
 **2. Server build** (`npm run build && npm start`). A normal Next.js server with the `/api` routes: job feeds are fetched on the server (so all six sources work in the browser, plus Jooble/Adzuna), and AI keys live safely in environment variables.
 
-- **Docker:** `docker run -p 3000:3000 -e GROQ_API_KEY=... ghcr.io/osoba-joshua/cv-tracker:latest` (image is published automatically; see [docker.yml](.github/workflows/docker.yml)), or `docker build -t cv-tracker . && docker run -p 3000:3000 cv-tracker`.
+- **Docker:** `docker build -t cv-tracker . && docker run -p 3000:3000 -e GROQ_API_KEY=... cv-tracker`. A workflow also publishes the image to `ghcr.io/<owner>/<repo>:latest` (see [docker.yml](.github/workflows/docker.yml)); GitHub creates new packages as private, so the owner must switch it to public once (Packages → cv-tracker → Package settings → Change visibility) before others can `docker pull` it.
 - **Render (free plan):** [Deploy to Render](https://render.com/deploy?repo=https://github.com/osoba-joshua/cv-tracker) reads [render.yaml](render.yaml).
 - **Vercel:** [Deploy with Vercel](https://vercel.com/new/clone?repository-url=https://github.com/osoba-joshua/cv-tracker) (zero config).
 - Set `NEXT_PUBLIC_SITE_URL` to your public URL so share images resolve, add optional keys as environment variables, and keep `AI_RATE_LIMIT` low if AI is on. The in-memory job cache and rate limiter are per instance, which is fine for one server.
