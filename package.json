@@ -9,9 +9,20 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:static": "node scripts/build-static.mjs",
+    "mobile:sync": "npm run build:static && cap sync && node scripts/mobile-assets.mjs",
+    "android:open": "npm run mobile:sync && cap open android",
+    "ios:open": "npm run mobile:sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",
     "react": "19.3.0",
@@ -19,6 +30,9 @@
     "unpdf": "^1.9.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19",

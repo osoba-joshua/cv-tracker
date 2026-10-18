@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, BarChart3, Bot, ChevronDown, Columns3, Globe, Lock, MapPin, Moon, ShieldCheck, Sparkles, Sun, Target, Zap } from "lucide-react";
+import { engine } from "@/lib/engine";
 import { useApp } from "@/lib/store";
 import Dropzone from "./Dropzone";
 import InteractiveBackground from "./InteractiveBackground";
@@ -76,8 +77,8 @@ export default function Landing() {
   const [stats, setStats] = useState<{ jobs: number; sources: number; countries: number } | null>(null);
 
   useEffect(() => {
-    fetch("/api/stats")
-      .then((r) => r.json())
+    engine
+      .stats()
       .then(setStats)
       .catch(() => setStats({ jobs: 0, sources: 6, countries: 85 }));
   }, []);
@@ -87,7 +88,7 @@ export default function Landing() {
   return (
     <div className="relative overflow-x-clip">
       {/* ---------- nav ---------- */}
-      <header className="glass sticky top-0 z-40 border-b border-line/70">
+      <header className="glass sticky top-0 z-40 border-b border-line/70 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
           <Logo />
           <nav className="ml-6 hidden items-center gap-6 text-sm text-muted md:flex" aria-label="Sections">

@@ -1,12 +1,12 @@
 "use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { ENGINE_MODE } from "@/lib/engine";
+import { AppLink, usePath } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import { NAV } from "./Header";
 
 /** Native-app style tab bar for phones. */
 export default function MobileNav() {
-  const path = usePathname();
+  const path = usePath();
   const { trackedList, newCount } = useApp();
   return (
     <nav
@@ -17,8 +17,9 @@ export default function MobileNav() {
         const active = href === "/" ? path === "/" : path.startsWith(href);
         const badge = href === "/tracker" ? trackedList.length : href === "/" ? newCount : 0;
         return (
-          <Link
+          <AppLink
             key={href}
+            prefetch={ENGINE_MODE === "local" ? false : undefined}
             href={href}
             aria-current={active ? "page" : undefined}
             className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors ${active ? "text-accent" : "text-muted"}`}
@@ -30,7 +31,7 @@ export default function MobileNav() {
               )}
             </span>
             {label}
-          </Link>
+          </AppLink>
         );
       })}
     </nav>

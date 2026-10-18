@@ -1,5 +1,5 @@
 import { AiError, checkRate, clientIp } from "@/lib/ai";
-import { aiProfile } from "@/lib/prompts";
+import { CoreError, coreAiProfile } from "@/lib/core";
 
 export const maxDuration = 60;
 
@@ -7,12 +7,10 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     checkRate(clientIp(req));
-    const body = await req.json();
-    const text = typeof body.text === "string" ? body.text : "";
-    if (text.trim().length < 30) return Response.json({ error: "No CV text provided." }, { status: 400 });
-    return Response.json(await aiProfile(text));
+    return Response.json(await coreAiProfile((await req.json()).text));
   } catch (e) {
     if (e instanceof AiError) return Response.json({ error: e.message, code: e.code }, { status: e.status });
+    if (e instanceof CoreError) return Response.json({ error: e.message, code: e.code }, { status: e.status });
     return Response.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

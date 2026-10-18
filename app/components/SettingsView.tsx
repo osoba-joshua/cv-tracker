@@ -1,6 +1,7 @@
 "use client";
 import { useRef, type ReactNode } from "react";
-import { Bot, Check, Database, Download, ExternalLink, Globe, Keyboard, Monitor, Moon, Palette, RotateCcw, Settings as Cog, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
+import { Bot, Check, KeyRound, Database, Download, ExternalLink, Globe, Keyboard, Monitor, Moon, Palette, RotateCcw, Settings as Cog, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
+import type { AiKeys } from "@/lib/ai";
 import { clearAllData, downloadFile, exportBackup, importBackup } from "@/lib/backup";
 import { ACCENTS, type Accent, type DarkStyle, type Density, type ThemePref } from "@/lib/settings";
 import { useApp } from "@/lib/store";
@@ -43,8 +44,63 @@ function Segmented<T extends string>({ value, onChange, options, label }: { valu
   );
 }
 
+const KEY_FIELDS: { field: keyof AiKeys; label: string; href: string; placeholder: string; secret: boolean }[] = [
+  { field: "gemini", label: "Google Gemini", href: "https://aistudio.google.com/apikey", placeholder: "AIza…", secret: true },
+  { field: "groq", label: "Groq", href: "https://console.groq.com/keys", placeholder: "gsk_…", secret: true },
+  { field: "openrouter", label: "OpenRouter", href: "https://openrouter.ai/keys", placeholder: "sk-or-…", secret: true },
+  { field: "ollamaModel", label: "Ollama model (runs on your own computer)", href: "https://ollama.com", placeholder: "llama3.2", secret: false },
+];
+
+function LocalAiKeys({ keys, setKeys, providers }: { keys: AiKeys; setKeys: (k: AiKeys) => void; providers: string[] }) {
+  return (
+    <div className="space-y-4 text-sm">
+      <p className="flex flex-wrap items-center gap-2">
+        {providers.length ? (
+          <>
+            <span className="chip chip-good">Connected</span>
+            {providers.map((p) => (
+              <span key={p} className="chip">{p}</span>
+            ))}
+          </>
+        ) : (
+          <span className="chip">Not connected</span>
+        )}
+      </p>
+      <p className="text-muted">
+        Paste a free key from one provider. It is saved only on this device and is sent only to that provider when you press an AI button. If you set several, the next is used when one is busy.
+      </p>
+      <div className="grid gap-3">
+        {KEY_FIELDS.map((f) => (
+          <div key={f.field}>
+            <label className="label flex items-center justify-between" htmlFor={`key-${f.field}`}>
+              <span>{f.label}</span>
+              <a href={f.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 normal-case tracking-normal text-accent hover:underline">
+                Get a free key <ExternalLink size={11} />
+              </a>
+            </label>
+            <input
+              id={`key-${f.field}`}
+              className="input font-mono text-[13px]"
+              type={f.secret ? "password" : "text"}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder={f.placeholder}
+              value={keys[f.field] ?? ""}
+              onChange={(e) => setKeys({ ...keys, [f.field]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="flex items-start gap-2 text-xs text-muted">
+        <KeyRound size={14} className="mt-0.5 shrink-0" /> Keys never leave your device except to call the AI provider you chose. Anyone with access to this device&apos;s browser data could read them.
+      </p>
+    </div>
+  );
+}
+
 export default function SettingsView() {
-  const { ready, settings, setSettings, ai, data, trackedList, searches, hiddenIds, restoreHidden, cvText, setHelpOpen, toast } = useApp();
+  const { ready, settings, setSettings, ai, data, trackedList, searches, hiddenIds, restoreHidden, cvText, setHelpOpen, toast, engineMode, aiKeys, setAiKeys } = useApp();
   const file = useRef<HTMLInputElement>(null);
   if (!ready) return <div className="mx-auto max-w-3xl px-4 py-8"><div className="skeleton h-64 rounded-2xl" /></div>;
 
@@ -114,7 +170,9 @@ export default function SettingsView() {
       <LocationPanel />
 
       <Section icon={Bot} title="AI copilot" sub="Optional and free. Powers fit checks, cover letters, interview prep and CV reviews.">
-        {ai.enabled ? (
+        {engineMode === "local" ? (
+          <LocalAiKeys keys={aiKeys} setKeys={setAiKeys} providers={ai.providers} />
+        ) : ai.enabled ? (
           <div className="space-y-3 text-sm">
             <p className="flex flex-wrap items-center gap-2"><span className="chip chip-good">Connected</span> {ai.providers.map((p) => <span key={p} className="chip">{p}</span>)}</p>
             <p className="text-muted">Your CV text and the job text are sent to these providers only when you press a button or upload a CV. Nothing is stored on a server. If one is busy, the next one is tried.</p>
@@ -149,7 +207,7 @@ export default function SettingsView() {
           <span className={`chip ${local?.jooble ? "chip-good" : ""}`}>Jooble {local?.jooble ? "on" : "off"}</span>
           <span className={`chip ${local?.adzuna ? "chip-good" : ""}`}>Adzuna {local?.adzuna ? "on" : "off"}</span>
         </div>
-        <p className="mt-3 text-xs text-muted">Jooble and Adzuna add local on-site jobs. Add free keys in .env to turn them on.</p>
+        <p className="mt-3 text-xs text-muted">{engineMode === "local" ? "Himalayas and Working Nomads only load in the Android and iOS apps (websites can't read them directly). Jooble and Adzuna need the server version." : "Jooble and Adzuna add local on-site jobs. Add free keys in .env to turn them on."}</p>
       </Section>
 
       <Section icon={Database} title="Your data" sub="No account, no server. Back up or wipe it any time.">

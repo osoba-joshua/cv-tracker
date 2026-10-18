@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   BarChart3, Bookmark, Columns3, Compass, CornerDownLeft, Download, EyeOff, FileText, Filter, Flame, Globe, Keyboard, Moon,
   Search, Settings as Cog, Sparkles, Sun, Upload, Zap, type LucideIcon,
 } from "lucide-react";
 import { toCsv } from "@/lib/client";
+import { useNavigate } from "@/lib/nav";
 import { downloadFile } from "@/lib/backup";
 import { useApp } from "@/lib/store";
 import { DEFAULT_FILTERS } from "./Filters";
@@ -13,7 +13,7 @@ import { DEFAULT_FILTERS } from "./Filters";
 type Item = { id: string; group: string; label: string; hint?: string; icon: LucideIcon; keywords?: string; run: () => void };
 
 export default function CommandPalette() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const app = useApp();
   const { setPaletteOpen, filters, setFilters, dark, setSettings, trackedList, searches, hiddenIds } = app;
   const [query, setQuery] = useState("");
@@ -32,7 +32,7 @@ export default function CommandPalette() {
   }, []);
 
   const items = useMemo<Item[]>(() => {
-    const go = (href: string) => () => router.push(href);
+    const go = (href: string) => () => navigate(href);
     const out: Item[] = [
       { id: "n-discover", group: "Go to", label: "Discover jobs", icon: Compass, run: go("/") },
       { id: "n-insights", group: "Go to", label: "Insights", hint: "Skill gaps, salaries, market", icon: BarChart3, run: go("/insights") },
@@ -40,14 +40,14 @@ export default function CommandPalette() {
       { id: "n-cv", group: "Go to", label: "My CV", hint: "Review and improve", icon: FileText, run: go("/cv") },
       { id: "n-settings", group: "Go to", label: "Settings", icon: Cog, run: go("/settings") },
 
-      { id: "f-remote", group: "Filters", label: "Remote jobs only", icon: Globe, keywords: "filter", run: () => { setFilters({ ...filters, remote: true }); router.push("/"); } },
-      { id: "f-strong", group: "Filters", label: "Strong matches only (65%+)", icon: Zap, keywords: "filter best", run: () => { setFilters({ ...filters, minScore: 65 }); router.push("/"); } },
-      { id: "f-24h", group: "Filters", label: "Posted in the last 24 hours", icon: Flame, keywords: "filter new recent", run: () => { setFilters({ ...filters, posted: 1 }); router.push("/"); } },
-      { id: "f-new", group: "Filters", label: "New since my last visit", icon: Sparkles, keywords: "filter", run: () => { setFilters({ ...filters, onlyNew: true }); router.push("/"); } },
+      { id: "f-remote", group: "Filters", label: "Remote jobs only", icon: Globe, keywords: "filter", run: () => { setFilters({ ...filters, remote: true }); navigate("/"); } },
+      { id: "f-strong", group: "Filters", label: "Strong matches only (65%+)", icon: Zap, keywords: "filter best", run: () => { setFilters({ ...filters, minScore: 65 }); navigate("/"); } },
+      { id: "f-24h", group: "Filters", label: "Posted in the last 24 hours", icon: Flame, keywords: "filter new recent", run: () => { setFilters({ ...filters, posted: 1 }); navigate("/"); } },
+      { id: "f-new", group: "Filters", label: "New since my last visit", icon: Sparkles, keywords: "filter", run: () => { setFilters({ ...filters, onlyNew: true }); navigate("/"); } },
       { id: "f-clear", group: "Filters", label: "Clear all filters", icon: Filter, keywords: "reset", run: () => setFilters({ ...DEFAULT_FILTERS, sort: filters.sort }) },
 
       { id: "a-theme", group: "Actions", label: dark ? "Switch to light theme" : "Switch to dark theme", icon: dark ? Sun : Moon, keywords: "appearance dark light", run: () => setSettings((s) => ({ ...s, theme: dark ? "light" : "dark" })) },
-      { id: "a-cv", group: "Actions", label: "Upload a new CV", icon: Upload, keywords: "replace reset", run: () => { app.reset(); router.push("/"); } },
+      { id: "a-cv", group: "Actions", label: "Upload a new CV", icon: Upload, keywords: "replace reset", run: () => { app.reset(); navigate("/"); } },
       { id: "a-keys", group: "Actions", label: "Keyboard shortcuts", icon: Keyboard, keywords: "help", run: () => app.setHelpOpen(true) },
     ];
     if (trackedList.length) {
@@ -57,14 +57,14 @@ export default function CommandPalette() {
       out.push({ id: "a-restore", group: "Actions", label: `Restore ${hiddenIds.length} hidden jobs`, icon: EyeOff, run: () => app.restoreHidden() });
     }
     for (const s of searches) {
-      out.push({ id: `s-${s.id}`, group: "Saved searches", label: s.name, hint: s.query || s.q || "filters", icon: Bookmark, run: () => { app.applySearch(s); router.push("/"); } });
+      out.push({ id: `s-${s.id}`, group: "Saved searches", label: s.name, hint: s.query || s.q || "filters", icon: Bookmark, run: () => { app.applySearch(s); navigate("/"); } });
     }
     for (const t of trackedList.slice(0, 40)) {
       out.push({ id: `t-${t.job.id}`, group: "Tracked jobs", label: t.job.title, hint: `${t.job.company} · ${t.stage}`, icon: Columns3, keywords: t.job.company, run: () => app.openJob(t.job.id) });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, dark, trackedList, searches, hiddenIds.length, router]);
+  }, [filters, dark, trackedList, searches, hiddenIds.length, navigate]);
 
   const results = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -77,12 +77,12 @@ export default function CommandPalette() {
         label: `Search job boards for "${query.trim()}"`,
         hint: "Finds jobs even outside your CV",
         icon: Search,
-        run: () => { app.setServerQuery(query.trim()); router.push("/"); },
+        run: () => { app.setServerQuery(query.trim()); navigate("/"); },
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, query, router]);
+  }, [items, query, navigate]);
 
   const active = Math.min(idx, Math.max(results.length - 1, 0));
   useEffect(() => {

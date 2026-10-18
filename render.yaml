@@ -1,0 +1,13 @@
+# One-click deploy on Render's free plan: https://render.com/deploy?repo=https://github.com/osoba-joshua/cv-tracker
+services:
+  - type: web
+    name: cv-tracker
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # Optional free AI keys: add any of GEMINI_API_KEY, GROQ_API_KEY or OPENROUTER_API_KEY in the Render dashboard.

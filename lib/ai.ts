@@ -1,3 +1,5 @@
+import { httpRequest } from "./http";
+
 // A tiny client for any OpenAI-compatible chat API. Free options that work out of the box:
 //   Google Gemini (free key), Groq (free key), OpenRouter (free models), Ollama (runs on your own computer).
 // Several can be configured at once: if one is rate limited or down, the next one is tried.
@@ -14,25 +16,41 @@ export class AiError extends Error {
   }
 }
 
-const env = (k: string) => process.env[k]?.trim() || undefined;
+// process.env is only read on a server; in the browser (on-device engine) it may not exist at all.
+const env = (k: string) => {
+  try {
+    return process.env[k]?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
 
-export function providers(): Provider[] {
+/** Keys a person pastes into Settings when the app runs on their device (no server to hold a .env). */
+export type AiKeys = { gemini?: string; groq?: string; openrouter?: string; ollamaModel?: string; ollamaHost?: string };
+
+const clean = (v?: string) => v?.trim() || undefined;
+
+export function providers(keys?: AiKeys): Provider[] {
+  // With explicit keys (on-device) use only those; otherwise read the server's environment.
+  const get = (envName: string, own?: string) => (keys ? clean(own) : env(envName));
+  const gemini = get("GEMINI_API_KEY", keys?.gemini);
+  const groq = get("GROQ_API_KEY", keys?.groq);
+  const openrouter = get("OPENROUTER_API_KEY", keys?.openrouter);
+  const ollamaModel = get("OLLAMA_MODEL", keys?.ollamaModel);
+  const ollamaHost = (keys ? clean(keys.ollamaHost) : env("OLLAMA_HOST")) ?? "http://localhost:11434";
+
   const list: Provider[] = [];
-  if (env("GEMINI_API_KEY"))
-    list.push({ name: "Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", key: env("GEMINI_API_KEY"), model: env("GEMINI_MODEL") ?? "gemini-3.5-flash-lite" });
-  if (env("GROQ_API_KEY"))
-    list.push({ name: "Groq", base: "https://api.groq.com/openai/v1", key: env("GROQ_API_KEY"), model: env("GROQ_MODEL") ?? "openai/gpt-oss-120b" });
-  if (env("OPENROUTER_API_KEY"))
-    list.push({ name: "OpenRouter", base: "https://openrouter.ai/api/v1", key: env("OPENROUTER_API_KEY"), model: env("OPENROUTER_MODEL") ?? "openrouter/free" });
-  if (env("OLLAMA_MODEL"))
-    list.push({ name: "Ollama", base: `${env("OLLAMA_HOST") ?? "http://localhost:11434"}/v1`, model: env("OLLAMA_MODEL")! });
-  if (env("AI_BASE_URL") && env("AI_MODEL"))
+  if (gemini) list.push({ name: "Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", key: gemini, model: env("GEMINI_MODEL") ?? "gemini-3.5-flash-lite" });
+  if (groq) list.push({ name: "Groq", base: "https://api.groq.com/openai/v1", key: groq, model: env("GROQ_MODEL") ?? "openai/gpt-oss-120b" });
+  if (openrouter) list.push({ name: "OpenRouter", base: "https://openrouter.ai/api/v1", key: openrouter, model: env("OPENROUTER_MODEL") ?? "openrouter/free" });
+  if (ollamaModel) list.push({ name: "Ollama", base: `${ollamaHost.replace(/\/+$/, "")}/v1`, model: ollamaModel });
+  if (!keys && env("AI_BASE_URL") && env("AI_MODEL"))
     list.push({ name: "Custom", base: env("AI_BASE_URL")!.replace(/\/+$/, ""), key: env("AI_API_KEY"), model: env("AI_MODEL")! });
   return list;
 }
 
-export const aiStatus = () => {
-  const p = providers();
+export const aiStatus = (keys?: AiKeys) => {
+  const p = providers(keys);
   return { enabled: p.length > 0, providers: p.map((x) => x.name) };
 };
 
@@ -66,8 +84,9 @@ function parseJson(raw: string): unknown {
 }
 
 async function call(p: Provider, system: string, user: string, maxTokens: number, jsonMode: boolean) {
-  const res = await fetch(`${p.base}/chat/completions`, {
+  const res = await httpRequest(`${p.base}/chat/completions`, {
     method: "POST",
+    timeoutMs: 60_000,
     headers: { "content-type": "application/json", ...(p.key ? { authorization: `Bearer ${p.key}` } : {}) },
     body: JSON.stringify({
       model: p.model,
@@ -79,22 +98,21 @@ async function call(p: Provider, system: string, user: string, maxTokens: number
       max_tokens: maxTokens,
       ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     }),
-    signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    return { ok: false as const, status: res.status, text };
-  }
-  const json = await res.json();
+  if (!res.ok) return { ok: false as const, status: res.status, text: res.text };
+  let json: { choices?: { message?: { content?: unknown } }[] } | null = null;
+  try {
+    json = JSON.parse(res.text);
+  } catch {}
   const content: unknown = json?.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) return { ok: false as const, status: 502, text: "empty response" };
   return { ok: true as const, content };
 }
 
 /** Asks the configured AI for a JSON object. Tries each provider in turn. */
-export async function askJson(system: string, user: string, maxTokens = 1500): Promise<{ data: Record<string, unknown>; provider: string }> {
-  const list = providers();
-  if (!list.length) throw new AiError("AI isn't set up yet. Add a free API key to enable it (see the README).", "not_configured", 503);
+export async function askJson(system: string, user: string, maxTokens = 1500, keys?: AiKeys): Promise<{ data: Record<string, unknown>; provider: string }> {
+  const list = providers(keys);
+  if (!list.length) throw new AiError("AI isn't set up yet. Add a free API key to enable it (Settings, or the README for the server version).", "not_configured", 503);
 
   let rateLimited = false;
   for (const p of list) {

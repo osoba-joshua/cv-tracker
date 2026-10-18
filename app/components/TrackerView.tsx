@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { AlertCircle, Bookmark, CalendarClock, Columns3, Download, ExternalLink, History, LayoutGrid, List, MessageSquare, Search, Trash2, X } from "lucide-react";
 import { STAGES, isDue, timeAgo, toCsv, useLocalStorage, type Stage, type Tracked } from "@/lib/client";
 import { downloadFile } from "@/lib/backup";
+import { AppLink } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import { Logo } from "./JobCard";
 import ScoreRing from "./ScoreRing";
@@ -129,7 +129,7 @@ export default function TrackerView() {
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-accent-soft text-accent"><Bookmark size={28} /></span>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight">Nothing tracked yet</h1>
         <p className="mt-2 text-muted">Save jobs from Discover and follow them from Saved all the way to Offer, with notes and follow-up reminders.</p>
-        <Link href="/" className="btn btn-primary btn-lg mt-6">Browse jobs</Link>
+        <AppLink href="/" className="btn btn-primary btn-lg mt-6">Browse jobs</AppLink>
       </main>
     );
   }

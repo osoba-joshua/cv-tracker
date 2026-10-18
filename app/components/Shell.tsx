@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useNavigate, usePath } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import CommandPalette from "./CommandPalette";
 import Header from "./Header";
 import JobDrawer from "./JobDrawer";
 import MobileNav from "./MobileNav";
+import NativeBridge from "./NativeBridge";
 import Shortcuts from "./Shortcuts";
 import ToastHost from "./ToastHost";
 
 /** The frame around every screen: header, mobile tab bar, command palette, job panel and toasts. */
 export default function Shell({ children }: { children: ReactNode }) {
-  const path = usePathname();
-  const router = useRouter();
+  const path = usePath();
+  const navigate = useNavigate();
   const { ready, profile, paletteOpen, setPaletteOpen, helpOpen, setHelpOpen, selected } = useApp();
 
   // Ctrl/Cmd+K opens the command palette from anywhere
@@ -39,14 +40,14 @@ export default function Shell({ children }: { children: ReactNode }) {
         e.preventDefault();
         e.stopImmediatePropagation(); // don't let "s" also save a job on Discover
         armed = 0;
-        router.push(routes[e.key]);
+        navigate(routes[e.key]);
         return;
       }
       armed = e.key === "g" ? Date.now() : 0;
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [router]);
+  }, [navigate]);
 
   // Spotlight: tell the hovered card where the pointer is so its glow can follow
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       {helpOpen && <Shortcuts onClose={() => setHelpOpen(false)} />}
       {selected && <JobDrawer />}
       <ToastHost />
+      <NativeBridge />
     </>
   );
 }

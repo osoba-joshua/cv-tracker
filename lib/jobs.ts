@@ -1,4 +1,5 @@
 import { countryByCode, parseGeo } from "./geo";
+import { httpRequest } from "./http";
 import { levelFromTitle } from "./profile";
 import { findSkills } from "./skills";
 import type { Job, Level, UserLocation } from "./types";
@@ -39,14 +40,17 @@ function cached(key: string, load: () => Promise<Job[]>): Promise<Job[]> {
 
 const UA = "cv-tracker/0.2 (open-source job matcher)";
 
-async function getJson(url: string, init?: RequestInit): Promise<any> {
-  const r = await fetch(url, {
-    ...init,
-    headers: { "User-Agent": UA, Accept: "application/json", ...(init?.headers ?? {}) },
-    signal: AbortSignal.timeout(9000),
+async function getJson(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<any> {
+  // A custom User-Agent is only sent from a server: in a browser it would force a CORS preflight that most job APIs reject.
+  const ua: Record<string, string> = typeof window === "undefined" ? { "User-Agent": UA } : {};
+  const r = await httpRequest(url, {
+    method: init?.method,
+    headers: { ...ua, Accept: "application/json", ...(init?.headers ?? {}) },
+    body: init?.body,
+    timeoutMs: 9000,
   });
   if (!r.ok) throw new Error(`${new URL(url).host} -> ${r.status}`);
-  return r.json();
+  return JSON.parse(r.text);
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", hellip: "…", rsquo: "'", lsquo: "'", ndash: "–", mdash: "—" };

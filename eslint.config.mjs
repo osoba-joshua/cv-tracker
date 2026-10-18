@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated or native code (the web bundle is copied into the Android/iOS projects)
+    "android/**",
+    "ios/**",
+    "scripts/.stash/**",
+    "coverage/**",
   ]),
 ]);
 

@@ -11,10 +11,14 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 // Set NEXT_PUBLIC_SITE_URL when you deploy so share images get absolute URLs.
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+// The static build has no dynamic manifest route; it ships a plain file instead (see scripts/build-static.mjs).
+const isStatic = process.env.NEXT_PUBLIC_ENGINE === "local";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "CV Tracker",
+  ...(isStatic ? { manifest: `${basePath}/manifest.webmanifest` } : {}),
   appleWebApp: { capable: true, title: "CV Tracker", statusBarStyle: "default" },
   title: { default: "CV Tracker: find jobs that fit your CV", template: "%s · CV Tracker" },
   description: "Upload your CV, get live remote and local job postings ranked by fit, see your skill gaps, and track your applications. Free and private.",
@@ -28,6 +32,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover", // lets the native apps draw under the notch; paddings use env(safe-area-inset-*)
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f6f7fa" },
     { media: "(prefers-color-scheme: dark)", color: "#090b0f" },

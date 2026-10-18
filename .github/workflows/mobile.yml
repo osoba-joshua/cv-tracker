@@ -1,0 +1,101 @@
+name: Mobile apps (Android + iOS)
+
+# Builds installable apps from the same code as the website:
+#   Android: a debug-signed APK you can install directly on any Android phone
+#   iOS:     an unsigned .ipa (sideload with AltStore / Sideloadly) plus a simulator build
+# Push a tag like v1.0.0 to also publish both on the repository's Releases page.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run build:static
+      - run: node scripts/mobile-assets.mjs
+      - run: npx cap sync android
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk CV-Tracker-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CV-Tracker-android
+          path: CV-Tracker-android.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:static
+      - name: Create the iOS project
+        run: npx cap add ios
+      - run: node scripts/mobile-assets.mjs
+      - run: npx cap sync ios
+      - name: Build (unsigned, for devices)
+        run: |
+          if [ -d ios/App/App.xcworkspace ]; then TARGET="-workspace ios/App/App.xcworkspace"; else TARGET="-project ios/App/App.xcodeproj"; fi
+          xcodebuild $TARGET -scheme App -configuration Release -sdk iphoneos \
+            -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+          mkdir -p Payload
+          cp -R build-device/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry CV-Tracker-ios-unsigned.ipa Payload
+      - name: Build (simulator)
+        run: |
+          if [ -d ios/App/App.xcworkspace ]; then TARGET="-workspace ios/App/App.xcworkspace"; else TARGET="-project ios/App/App.xcodeproj"; fi
+          xcodebuild $TARGET -scheme App -configuration Debug -sdk iphonesimulator \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          (cd build-sim/Build/Products/Debug-iphonesimulator && zip -qry "$GITHUB_WORKSPACE/CV-Tracker-ios-simulator.zip" App.app)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CV-Tracker-ios
+          path: |
+            CV-Tracker-ios-unsigned.ipa
+            CV-Tracker-ios-simulator.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/CV-Tracker-android.apk
+            dist/CV-Tracker-ios-unsigned.ipa
+            dist/CV-Tracker-ios-simulator.zip

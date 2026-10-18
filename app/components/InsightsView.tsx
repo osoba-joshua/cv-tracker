@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useMemo, type ReactNode } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { BarChart3, Building2, Check, Clock, DollarSign, Globe, Lightbulb, MapPin, Search, Sparkles, Target, TrendingUp, Upload, Wifi, Zap } from "lucide-react";
 import { computeInsights } from "@/lib/insights";
+import { AppLink, useNavigate } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import { BarList, Donut, Histogram } from "./Charts";
 import { Logo } from "./JobCard";
@@ -29,7 +28,7 @@ export function NeedCv({ what }: { what: string }) {
       <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent"><Upload size={24} /></span>
       <h1 className="mt-5 text-xl font-semibold">Upload your CV first</h1>
       <p className="mt-2 text-muted">{what}</p>
-      <Link href="/" className="btn btn-primary btn-lg mt-6">Upload your CV</Link>
+      <AppLink href="/" className="btn btn-primary btn-lg mt-6">Upload your CV</AppLink>
     </div>
   );
 }
@@ -45,7 +44,7 @@ function Kpi({ icon: Icon, label, value, sub }: { icon: typeof Zap; label: strin
 }
 
 export default function InsightsView() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { ready, profile, setProfile, data, searching, hiddenSet, showAbroad, filters, setFilters, toast, loc, markVisited } = useApp();
   useEffect(() => {
     if (ready && profile && data) markVisited("insights");
@@ -74,7 +73,7 @@ export default function InsightsView() {
   };
   const findJobs = (skill: string) => {
     setFilters({ ...filters, q: skill });
-    router.push("/");
+    navigate("/");
   };
 
   return (

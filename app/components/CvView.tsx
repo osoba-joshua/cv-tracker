@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Copy, FileText, KeyRound, Loader2, Sparkles, XCircle } from "lucide-react";
 import { reviewCv, type Check } from "@/lib/cvReview";
+import { engine } from "@/lib/engine";
 import { useApp } from "@/lib/store";
 import Dropzone from "./Dropzone";
 import ProfilePanel from "./ProfilePanel";
@@ -42,7 +43,7 @@ function Group({ title, items, defaultOpen }: { title: string; items: Check[]; d
 }
 
 export default function CvView() {
-  const { ready, profile, cvText, parsing, parseError, onFile, onText, loadSample, ai, toast, markVisited } = useApp();
+  const { ready, profile, cvText, parsing, parseError, onFile, onText, loadSample, ai, toast, markVisited, keysArg } = useApp();
   useEffect(() => {
     if (ready && profile && cvText) markVisited("cv");
   }, [ready, profile, cvText, markVisited]);
@@ -57,10 +58,8 @@ export default function CvView() {
     setBusy(true);
     setAiError("");
     try {
-      const res = await fetch("/api/ai/cv", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cv: cvText, roles: profile.titles }) });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "AI review failed");
-      setReview(json.result);
+      const json = await engine.aiCv({ cv: cvText, roles: profile.titles }, keysArg);
+      setReview(json.result as unknown as AiReview);
     } catch (e) {
       setAiError(e instanceof Error ? e.message : "AI review failed");
     } finally {
@@ -139,7 +138,7 @@ export default function CvView() {
             {ai.enabled === false && (
               <div className="flex items-start gap-3 rounded-xl border border-dashed border-line-strong p-4 text-sm">
                 <KeyRound size={18} className="mt-0.5 shrink-0 text-accent" />
-                <p className="leading-relaxed text-muted">Add a free Gemini or Groq key to your <code className="rounded bg-surface-2 px-1">.env</code> file and restart to unlock AI rewrites. The README has the 2-minute setup.</p>
+                <p className="leading-relaxed text-muted">Add a free Gemini or Groq key in <strong>Settings</strong> (or in your <code className="rounded bg-surface-2 px-1">.env</code> file if you run the server) to unlock AI rewrites.</p>
               </div>
             )}
             {busy && <div className="space-y-2.5"><div className="skeleton h-4 w-3/4 rounded" /><div className="skeleton h-4 w-full rounded" /><div className="skeleton h-4 w-5/6 rounded" /></div>}

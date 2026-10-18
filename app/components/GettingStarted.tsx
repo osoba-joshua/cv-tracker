@@ -1,6 +1,6 @@
 "use client";
-import Link from "next/link";
 import { ArrowRight, Check, X } from "lucide-react";
+import { AppLink } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 
 /** A short checklist that points new users at the app's best features. Disappears when done or dismissed. */
@@ -48,7 +48,7 @@ export default function GettingStarted() {
           return (
             <li key={s.label} className="bg-card">
               {s.href && !s.done ? (
-                <Link href={s.href} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">{inner}</Link>
+                <AppLink href={s.href} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">{inner}</AppLink>
               ) : (
                 <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
               )}

@@ -4,7 +4,9 @@ import {
   DEFAULT_LOC, SAMPLE_CV, getSeen, markSeen, useDebounced, useLocalStorage,
   type Loc, type Stage, type Tracked,
 } from "./client";
+import type { AiKeys } from "./ai";
 import { confetti } from "./confetti";
+import { ENGINE_MODE, engine, type Parsed } from "./engine";
 import { countryByCode, detectCountry } from "./geo";
 import { haystack } from "./search";
 import { DEFAULT_SETTINGS, SETTINGS_KEY, applySettings, resolveTheme, type Settings } from "./settings";
@@ -72,6 +74,12 @@ type Ctx = {
   aiReading: boolean;
   aiRead: () => void;
   ai: { enabled: boolean | null; providers: string[] };
+  /** "local" when the app runs on-device (static web build, Android, iOS): AI keys are entered in Settings. */
+  engineMode: "remote" | "local";
+  aiKeys: AiKeys;
+  setAiKeys: (k: AiKeys | ((p: AiKeys) => AiKeys)) => void;
+  /** The keys to hand to the engine: only needed on-device. */
+  keysArg?: AiKeys;
 
   // location
   loc: Loc;
@@ -154,6 +162,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [hiddenIds, setHiddenIds] = useLocalStorage<string[]>("cvt:hidden", []);
   const [saved, setSaved] = useLocalStorage<SavedFilters>("cvt:filters", DEFAULT_SAVED);
   const [searches, setSearches] = useLocalStorage<SavedSearch[]>("cvt:searches", []);
+  const [aiKeys, setAiKeys] = useLocalStorage<AiKeys>("cvt:aikeys", {});
+  const keysArg = ENGINE_MODE === "local" ? aiKeys : undefined;
   const [onboarding, setOnboarding] = useLocalStorage<Onboarding>("cvt:onboarding", { dismissed: false, insights: false, cv: false });
 
   const [q, setQ] = useState("");
@@ -208,13 +218,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [dismissToast],
   );
 
-  // ---- is an AI provider configured on the server?
+  // ---- is an AI provider available? (server .env, or keys pasted into Settings when running on-device)
   useEffect(() => {
-    fetch("/api/ai/status")
-      .then((r) => r.json())
-      .then((s) => setAi({ enabled: !!s.enabled, providers: s.providers ?? [] }))
-      .catch(() => setAi({ enabled: false, providers: [] }));
-  }, []);
+    let live = true;
+    engine
+      .aiStatus(ENGINE_MODE === "local" ? aiKeys : undefined)
+      .then((s) => live && setAi({ enabled: !!s.enabled, providers: s.providers ?? [] }))
+      .catch(() => live && setAi({ enabled: false, providers: [] }));
+    return () => {
+      live = false;
+    };
+  }, [aiKeys]);
 
   // ---- guess the country from the browser the first time (never overrides a choice the user made)
   useEffect(() => {
@@ -251,14 +265,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSearching(true);
     setSearchError("");
     try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ skills: p.skills, titles: p.titles, years: p.years, level: p.level, location: where, query: boardQuery }),
-      });
-      const json = await res.json();
+      const json = await engine.search({ skills: p.skills, titles: p.titles, years: p.years, level: p.level, location: where, query: boardQuery });
       if (id !== seq.current) return;
-      if (!res.ok) throw new Error(json.error ?? "Search failed");
       // Flag jobs we have not shown this person before ("New since your last visit")
       const ids: string[] = (json.results as ScoredJob[]).map((j) => j.id);
       const seen = getSeen();
@@ -289,10 +297,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAiReading(true);
       setNotice("");
       try {
-        const res = await fetch("/api/ai/profile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "AI couldn't read the CV");
-        const a: AiProfile = json.profile;
+        const json = await engine.aiProfile(text, keysArg);
+        const a = json.profile as unknown as AiProfile;
         setProfile((prev) => mergeProfile(prev ?? base, a));
         if (a.country && countryByCode(a.country)) setLoc((l) => (l.manual ? l : { ...l, country: a.country, city: l.city || a.city }));
       } catch (e) {
@@ -301,20 +307,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAiReading(false);
       }
     },
-    [setProfile, setLoc],
+    [setProfile, setLoc, keysArg],
   );
   const aiRead = useCallback(() => {
     if (profile && cvText) aiReadText(cvText, profile);
   }, [profile, cvText, aiReadText]);
 
   const parse = useCallback(
-    async (body: BodyInit, headers?: HeadersInit) => {
+    async (read: () => Promise<Parsed>) => {
       setParsing(true);
       setParseError("");
       try {
-        const res = await fetch("/api/parse", { method: "POST", body, headers });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Couldn't read that CV");
+        const json = await read();
         if (!json.profile.skills.length && !json.profile.titles.length && !ai.enabled) {
           throw new Error("We couldn't find any skills or roles in that CV. Try pasting the text instead.");
         }
@@ -333,15 +337,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [ai.enabled, aiReadText, setCvText, setProfile],
   );
-  const onFile = useCallback(
-    (f: File) => {
-      const fd = new FormData();
-      fd.append("cv", f);
-      parse(fd);
-    },
-    [parse],
-  );
-  const onText = useCallback((text: string) => parse(JSON.stringify({ text }), { "content-type": "application/json" }), [parse]);
+  const onFile = useCallback((f: File) => parse(() => engine.parseFile(f)), [parse]);
+  const onText = useCallback((text: string) => parse(() => engine.parseText(text)), [parse]);
   const loadSample = useCallback(() => onText(SAMPLE_CV), [onText]);
 
   const reset = useCallback(() => {
@@ -497,7 +494,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     ready, settings, setSettings, dark,
     profile, setProfile, cvText, parsing, parseError, notice, dismissNotice: () => setNotice(""),
-    onFile, onText, loadSample, reset, aiReading, aiRead, ai,
+    onFile, onText, loadSample, reset, aiReading, aiRead, ai, engineMode: ENGINE_MODE, aiKeys, setAiKeys, keysArg,
     loc, setLoc,
     data, searching, searchError, retry, serverQuery, setServerQuery,
     filters, setFilters, filterCount: activeFilterCount(filters), filtered, counts, newIds, newCount, terms, showAbroad,

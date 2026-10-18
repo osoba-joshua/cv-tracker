@@ -1,4 +1,4 @@
-import { askJson } from "./ai";
+import { askJson, type AiKeys } from "./ai";
 
 const S = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const A = (v: unknown, n: number, max: number) =>
@@ -24,7 +24,7 @@ export type AiProfile = {
   strengths: string[];
 };
 
-export async function aiProfile(cv: string): Promise<{ profile: AiProfile; provider: string }> {
+export async function aiProfile(cv: string, keys?: AiKeys): Promise<{ profile: AiProfile; provider: string }> {
   const system = `You are a careful recruiter reading a CV. ${SAFETY} ${GROUNDING}
 Return JSON with exactly these keys:
 "skills": up to 40 concrete professional skills, tools, languages or domains the CV evidences (Title Case, e.g. "React", "Project Management"),
@@ -35,7 +35,7 @@ Return JSON with exactly these keys:
 "city": their city if stated, else "",
 "summary": a 1-2 sentence neutral summary of the candidate (max 240 characters),
 "strengths": up to 4 short phrases naming their strongest selling points.`;
-  const { data, provider } = await askJson(system, `<cv>\n${cv.slice(0, 12000)}\n</cv>`, 1200);
+  const { data, provider } = await askJson(system, `<cv>\n${cv.slice(0, 12000)}\n</cv>`, 1200, keys);
   const lvl = Number(data.level);
   const years = Number(data.years);
   return {
@@ -56,7 +56,7 @@ Return JSON with exactly these keys:
 export type Task = "fit" | "cover" | "prep" | "tweak";
 export type Tone = "professional" | "friendly" | "concise";
 
-export async function aiJobTask(task: Task, cv: string, job: JobInput, tone: Tone = "professional") {
+export async function aiJobTask(task: Task, cv: string, job: JobInput, tone: Tone = "professional", keys?: AiKeys) {
   const cvBlock = `<cv>\n${cv.slice(0, 12000)}\n</cv>`;
   const input = `${cvBlock}\n\n${jobBlock(job)}`;
 
@@ -66,6 +66,7 @@ export async function aiJobTask(task: Task, cv: string, job: JobInput, tone: Ton
 Return JSON: "verdict" (one of "strong","good","stretch","poor"), "headline" (one sentence, max 160 chars), "strengths" (up to 4 short sentences citing the CV), "concerns" (up to 4 short sentences about real gaps or risks), "advice" (up to 4 concrete next steps to improve the application).`,
       input,
       1000,
+      keys,
     );
     const v = S(data.verdict, 10).toLowerCase();
     return {
@@ -88,6 +89,7 @@ Write a ${style} cover letter, at most 280 words, tailored to this job and built
 Return JSON: "subject" (an email subject line) and "letter" (the full letter, with paragraphs separated by blank lines).`,
       input,
       1200,
+      keys,
     );
     return { provider, result: { subject: S(data.subject, 150), letter: S(data.letter, 3500) } };
   }
@@ -99,6 +101,7 @@ Predict the 6 most likely interview questions for this role given the job descri
 Return JSON: "questions": an array of 6 objects with "q" (the question), "why" (why they'd ask it, max 120 chars) and "tip" (how this candidate should answer, using real CV material, max 220 chars).`,
       input,
       1500,
+      keys,
     );
     const qs = Array.isArray(data.questions) ? data.questions : [];
     return {
@@ -117,6 +120,7 @@ Return JSON: "questions": an array of 6 objects with "q" (the question), "why" (
 Return JSON: "summary" (a 2-3 sentence professional summary tailored to this job, based only on the CV), "bullets" (up to 5 rewritten or reordered CV bullet points that put the most relevant real experience first, each starting with a strong verb), "keywords" (up to 10 keywords from the job description the candidate can truthfully include because the CV supports them), "missing" (up to 4 things the job wants that the CV does not show, so the candidate should add them only if true).`,
     input,
     1400,
+    keys,
   );
   return {
     provider,
@@ -131,13 +135,14 @@ Return JSON: "summary" (a 2-3 sentence professional summary tailored to this job
 
 export type CvReviewAi = { headline: string; strengths: string[]; improvements: string[]; rewrites: { before: string; after: string }[]; keywords: string[] };
 
-export async function aiCvReview(cv: string, targetRoles: string[]): Promise<{ result: CvReviewAi; provider: string }> {
+export async function aiCvReview(cv: string, targetRoles: string[], keys?: AiKeys): Promise<{ result: CvReviewAi; provider: string }> {
   const { data, provider } = await askJson(
     `You are an expert CV reviewer and career coach. ${SAFETY} ${GROUNDING}
 Review the CV for a candidate targeting: ${targetRoles.slice(0, 4).join(", ") || "roles that fit their experience"}.
 Return JSON: "headline" (one honest sentence on the CV's overall state, max 180 chars), "strengths" (up to 4 specific things that work, citing the CV), "improvements" (up to 5 specific, prioritised changes), "rewrites" (up to 4 objects with "before": an actual line copied from the CV and "after": a stronger rewrite that adds NO new facts, only clearer wording, stronger verbs and a placeholder like [X%] where a metric would help), "keywords" (up to 10 keywords for these target roles that the CV supports but does not use prominently).`,
     `<cv>\n${cv.slice(0, 12000)}\n</cv>`,
     1500,
+    keys,
   );
   const rw = Array.isArray(data.rewrites) ? data.rewrites : [];
   return {

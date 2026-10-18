@@ -1,7 +1,7 @@
 import { cvToText } from "@/lib/cv";
-import { buildProfile } from "@/lib/profile";
+import { CoreError, coreParse } from "@/lib/core";
 
-// POST multipart (field "cv") or JSON {"text": "..."} -> { profile }
+// POST multipart (field "cv") or JSON {"text": "..."} -> { profile, text }
 export async function POST(req: Request) {
   try {
     let text = "";
@@ -14,12 +14,9 @@ export async function POST(req: Request) {
       if (file.size > 5_000_000) return Response.json({ error: "CV too large (max 5MB)" }, { status: 400 });
       text = await cvToText(file);
     }
-    text = text.slice(0, 60_000);
-    if (text.trim().length < 30) {
-      return Response.json({ error: "Couldn't read any text from that CV. Try a text-based PDF or paste it in." }, { status: 400 });
-    }
-    return Response.json({ profile: buildProfile(text), text });
+    return Response.json(coreParse(text));
   } catch (e) {
+    if (e instanceof CoreError) return Response.json({ error: e.message }, { status: e.status });
     return Response.json({ error: e instanceof Error ? e.message : "Something went wrong" }, { status: 500 });
   }
 }

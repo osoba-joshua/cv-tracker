@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Banknote, Bookmark, BookmarkCheck, Briefcase, Clock, EyeOff, ExternalLink, Gauge, Globe, GraduationCap, MapPin, Share2, X } from "lucide-react";
 import { STAGES, timeAgo, type Stage } from "@/lib/client";
 import { countryName } from "@/lib/geo";
+import { engine } from "@/lib/engine";
 import { useApp } from "@/lib/store";
 import { LEVEL_NAMES, type ScoredJob } from "@/lib/types";
 import AiAssistant from "./AiAssistant";
@@ -73,7 +74,7 @@ export default function JobDrawer() {
 }
 
 function DrawerBody({ job }: { job: ScoredJob }) {
-  const { closeJob, save, setStage, hide, ai, cvText, loc, tracked, addNote, toast } = useApp();
+  const { closeJob, save, setStage, hide, ai, cvText, loc, tracked, addNote, toast, keysArg } = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<TabId>("overview");
   const [full, setFull] = useState<string | null>(descMemo.get(job.id) ?? null);
@@ -83,12 +84,11 @@ function DrawerBody({ job }: { job: ScoredJob }) {
   useEffect(() => {
     let live = true;
     if (!descMemo.has(job.id)) {
-      fetch(`/api/job?id=${encodeURIComponent(job.id)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => {
-          const text = j?.description ?? job.description;
-          if (j?.description) descMemo.set(job.id, j.description);
-          if (live) setFull(text);
+      engine
+        .job(job.id)
+        .then((description) => {
+          if (description) descMemo.set(job.id, description);
+          if (live) setFull(description ?? job.description);
         })
         .catch(() => live && setFull(job.description));
     }
@@ -160,7 +160,7 @@ function DrawerBody({ job }: { job: ScoredJob }) {
         className="drawer relative flex h-full w-full max-w-2xl flex-col bg-bg outline-none"
         style={{ boxShadow: "var(--shadow-lg)" }}
       >
-        <div className="border-b border-line bg-card px-5 pt-5">
+        <div className="border-b border-line bg-card px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
           <div className="flex items-start gap-3.5">
             <Logo job={job} size={56} />
             <div className="min-w-0 flex-1">
@@ -269,7 +269,7 @@ function DrawerBody({ job }: { job: ScoredJob }) {
             </section>
           )}
 
-          {tab === "ai" && <AiAssistant job={fullJob} cv={cvText} enabled={ai.enabled} providers={ai.providers} onSaveNote={(text) => addNote(job, text)} />}
+          {tab === "ai" && <AiAssistant job={fullJob} cv={cvText} enabled={ai.enabled} providers={ai.providers} keys={keysArg} onSaveNote={(text) => addNote(job, text)} />}
         </div>
 
         <div className="space-y-3 border-t border-line bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

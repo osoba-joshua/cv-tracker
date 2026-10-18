@@ -1,6 +1,8 @@
 // Everything CV Tracker remembers lives in this browser (localStorage, keys start with "cvt:").
 // Backup/restore lets people move it between devices or keep a copy.
 
+import { isNative } from "./http";
+
 const PREFIX = "cvt:";
 const VERSION = 1;
 
@@ -48,7 +50,14 @@ export function clearAllData() {
   keys.forEach((k) => localStorage.removeItem(k));
 }
 
-export function downloadFile(name: string, content: string, type = "application/json") {
+export async function downloadFile(name: string, content: string, type = "application/json") {
+  if (isNative()) {
+    // WebViews can't save blob downloads, so write a temp file and hand it to the system share sheet
+    const [{ Filesystem, Directory, Encoding }, { Share }] = await Promise.all([import("@capacitor/filesystem"), import("@capacitor/share")]);
+    const file = await Filesystem.writeFile({ path: name, data: content, directory: Directory.Cache, encoding: Encoding.UTF8 });
+    await Share.share({ title: name, url: file.uri, dialogTitle: "Save or share" });
+    return;
+  }
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   a.click();

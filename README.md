@@ -45,6 +45,19 @@ Free forever, no account, no API keys required, and private by design: your CV a
 - **Installable** as an app on your phone or desktop. **Backup and restore** your data from Settings.
 - **Accessible**: semantic markup, keyboard navigation, focus management. Effects pause off-screen, render statically under reduced-motion, and can be disabled in Settings.
 
+## Get the app
+
+| Where | How |
+| --- | --- |
+| **Web** (nothing to install) | https://osoba-joshua.github.io/cv-tracker/ |
+| **Android** | Download `CV-Tracker-android.apk` from the [latest release](https://github.com/osoba-joshua/cv-tracker/releases/latest), open it on your phone and allow "install from this source". |
+| **iPhone / iPad** | Download `CV-Tracker-ios-unsigned.ipa` from the [latest release](https://github.com/osoba-joshua/cv-tracker/releases/latest) and install it with [AltStore](https://altstore.io) or [Sideloadly](https://sideloadly.io) using a free Apple ID (re-sign every 7 days). Apple's App Store / TestFlight need a paid developer account, so there is no store listing. |
+| **Run it yourself** | `npm install && npm run dev` (see below), or use Docker / one-click hosting in [Deploying](#deploying). |
+
+All three of Web, Android and iOS are the **same app running entirely on your device**: there is no server, no account and no tracking. Your CV, profile and tracker never leave the device. The Android and iOS apps can reach all six job boards (the web version can read four of them, because browsers block the other two). On those versions you paste an optional free AI key in **Settings** instead of using a `.env` file.
+
+**Updates:** the web version updates itself. For the phone apps, install the newest file from [Releases](https://github.com/osoba-joshua/cv-tracker/releases). On Android uninstall the old version first, because debug builds are signed with a new key each time. Your data stays in the app unless you uninstall, so use **Settings → Export backup** first.
+
 ## Quick start
 
 You need [Node.js](https://nodejs.org) 20 or newer.
@@ -67,6 +80,8 @@ Open http://localhost:3000 and upload your CV, or click **Try a sample**. No `.e
    - **OpenRouter**: https://openrouter.ai/keys -> `OPENROUTER_API_KEY`
    - **Ollama** (runs on your computer, fully private): install from https://ollama.com, run `ollama pull llama3.2`, then set `OLLAMA_MODEL=llama3.2`
 3. Restart `npm run dev`. AI buttons appear in each job and on the My CV screen.
+
+Using the website on GitHub Pages or the Android/iOS apps? There is no `.env` there: open **Settings → AI copilot** and paste a key. It is stored only on your device and sent only to the provider you chose.
 
 You can set several. If one is rate limited or down, the next is tried automatically. Free tiers have daily limits, so results are remembered for the session and the AI only runs when you press a button. A per-visitor rate limit (`AI_RATE_LIMIT`, default 40 per hour) protects your quota if you deploy publicly.
 
@@ -98,9 +113,15 @@ CI (GitHub Actions) runs lint, type-check, tests and a production build on every
 ```
 app/                    Next.js App Router
   page.tsx, insights/, tracker/, cv/, settings/    the five screens
-  api/parse, search, job, stats, ai/*              JSON API
+  api/parse, search, job, stats, ai/*              JSON API (server build; thin wrappers over lib/core.ts)
   components/                                       UI (Landing, DiscoverView, JobDrawer, TrackerView, ...)
+android/                Capacitor Android project (the iOS project is generated in CI)
+scripts/                static build, app icons and splash screens
 lib/
+  engine.ts             the one interface the UI uses for search, CV reading and AI: remote (calls /api) or local (on-device)
+  core.ts               all the logic with no HTTP: parse, search, job lookup, AI requests
+  nav.tsx               routing: normal routes on a server, #/hash routes in the static and native builds
+  http.ts               one way to make requests: native HTTP in the phone apps, fetch elsewhere
   store.tsx             one app store shared by every screen (profile, search, filters, tracker, toasts)
   skills.ts, profile.ts detect skills, roles, seniority (with strict matching for words like "Go" and "Excel")
   jobs.ts               fetch, normalise, de-duplicate and cache the job feeds
@@ -134,7 +155,26 @@ The UI uses these JSON endpoints, so other clients (for example a mobile app) ca
 
 ## Deploying
 
-It is a standard Next.js app. Any Node host works (Vercel, Railway, Fly.io, a VPS). Set `NEXT_PUBLIC_SITE_URL` to your public URL so share images resolve, add any optional keys as environment variables, and keep `AI_RATE_LIMIT` low if AI is on. The in-memory job cache and rate limiter are per instance, which is fine for a single server.
+There are two ways to build the app, and you can use either:
+
+**1. Static, serverless build** (`npm run build:static` -> `./out`). Plain files that run entirely in the browser. Host them anywhere (GitHub Pages, Netlify, Cloudflare Pages, S3). This is what the GitHub Pages site and the phone apps use. Set `NEXT_PUBLIC_BASE_PATH` if you host under a sub-path (the Pages workflow does).
+
+**2. Server build** (`npm run build && npm start`). A normal Next.js server with the `/api` routes: job feeds are fetched on the server (so all six sources work in the browser, plus Jooble/Adzuna), and AI keys live safely in environment variables.
+
+- **Docker:** `docker run -p 3000:3000 -e GROQ_API_KEY=... ghcr.io/osoba-joshua/cv-tracker:latest` (image is published automatically; see [docker.yml](.github/workflows/docker.yml)), or `docker build -t cv-tracker . && docker run -p 3000:3000 cv-tracker`.
+- **Render (free plan):** [Deploy to Render](https://render.com/deploy?repo=https://github.com/osoba-joshua/cv-tracker) reads [render.yaml](render.yaml).
+- **Vercel:** [Deploy with Vercel](https://vercel.com/new/clone?repository-url=https://github.com/osoba-joshua/cv-tracker) (zero config).
+- Set `NEXT_PUBLIC_SITE_URL` to your public URL so share images resolve, add optional keys as environment variables, and keep `AI_RATE_LIMIT` low if AI is on. The in-memory job cache and rate limiter are per instance, which is fine for one server.
+
+### Building the apps yourself
+
+The apps are built for you by [GitHub Actions](.github/workflows/mobile.yml) on every push (artifacts) and every `v*` tag (Releases). To build locally:
+
+```bash
+npm install
+npm run android:open     # builds the static app, syncs it into android/, opens Android Studio (needs JDK 21)
+npm run ios:open         # macOS + Xcode only: run "npx cap add ios" once first
+```
 
 ## Job sources and attribution
 

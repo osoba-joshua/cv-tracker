@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Bot, Check, Copy, KeyRound, Loader2, RefreshCw, Save, Sparkles } from "lucide-react";
+import type { AiKeys } from "@/lib/ai";
+import { engine } from "@/lib/engine";
 import type { ScoredJob } from "@/lib/types";
 
 type Task = "fit" | "cover" | "prep" | "tweak";
@@ -141,12 +143,14 @@ export default function AiAssistant({
   cv,
   enabled,
   providers,
+  keys,
   onSaveNote,
 }: {
   job: ScoredJob;
   cv: string;
   enabled: boolean | null;
   providers: string[];
+  keys?: AiKeys;
   onSaveNote: (text: string) => void;
 }) {
   const [task, setTask] = useState<Task>("fit");
@@ -161,18 +165,15 @@ export default function AiAssistant({
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/ai/job", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      const json = await engine.aiJob(
+        {
           task,
           tone,
           cv,
           job: { title: job.title, company: job.company, location: job.location, description: job.description, matched: job.matched, missing: job.missing },
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "AI request failed");
+        },
+        keys,
+      );
       memo.set(key, { result: json.result, provider: json.provider, n: (memo.get(key)?.n ?? 0) + 1 });
       bump((n) => n + 1);
     } catch (e) {
@@ -192,7 +193,7 @@ export default function AiAssistant({
           <div>
             <h3 className="font-semibold">Unlock the free AI copilot</h3>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Get a fit check, tailored cover letter, interview questions and CV tweaks for every job. It&apos;s free: add a Gemini or Groq key (no card needed) to your <code className="rounded bg-surface-2 px-1">.env</code> file and restart. The README has the 2-minute setup.
+              Get a fit check, tailored cover letter, interview questions and CV tweaks for every job. It&apos;s free: add a Gemini or Groq key (no card needed) in <strong>Settings</strong> (or in your <code className="rounded bg-surface-2 px-1">.env</code> file if you run the server). It takes two minutes.
             </p>
           </div>
         </div>

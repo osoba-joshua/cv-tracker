@@ -1,7 +1,7 @@
 "use client";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { BarChart3, Columns3, Command, Compass, FileText, Moon, Search, Settings as Cog, Sun } from "lucide-react";
+import { ENGINE_MODE } from "@/lib/engine";
+import { AppLink, usePath } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import Logo from "./Logo";
 
@@ -13,24 +13,25 @@ export const NAV = [
 ] as const;
 
 export default function Header() {
-  const path = usePathname();
+  const path = usePath();
   const { trackedList, setSettings, setPaletteOpen, newCount, dark } = useApp();
   const due = trackedList.filter((t) => t.followUp && t.stage !== "rejected" && t.stage !== "offer" && t.followUp <= new Date().toISOString().slice(0, 10)).length;
 
   return (
-    <header className="glass sticky top-0 z-40 border-b border-line no-print">
+    <header className="glass sticky top-0 z-40 border-b border-line pt-[env(safe-area-inset-top)] no-print">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4">
-        <Link href="/" className="mr-3 shrink-0 rounded-lg" aria-label="CV Tracker home">
+        <AppLink href="/" className="mr-3 shrink-0 rounded-lg" aria-label="CV Tracker home">
           <Logo />
-        </Link>
+        </AppLink>
 
         <nav className="hidden items-center gap-0.5 md:flex" aria-label="Main">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? path === "/" : path.startsWith(href);
             const badge = href === "/tracker" ? trackedList.length : href === "/" ? newCount : 0;
             return (
-              <Link
+              <AppLink
                 key={href}
+                prefetch={ENGINE_MODE === "local" ? false : undefined}
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={`relative flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${
@@ -43,7 +44,7 @@ export default function Header() {
                   <span className={`rounded-full px-1.5 py-px text-[10px] font-semibold ${href === "/" ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted"}`}>{badge}</span>
                 )}
                 {href === "/tracker" && due > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-bad ring-2 ring-bg" aria-label={`${due} follow-ups due`} />}
-              </Link>
+              </AppLink>
             );
           })}
         </nav>
@@ -70,9 +71,9 @@ export default function Header() {
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <Link href="/settings" className={`btn btn-ghost btn-icon ${path === "/settings" ? "!bg-accent-soft !text-accent" : ""}`} aria-label="Settings">
+          <AppLink href="/settings" className={`btn btn-ghost btn-icon ${path === "/settings" ? "!bg-accent-soft !text-accent" : ""}`} aria-label="Settings">
             <Cog size={18} />
-          </Link>
+          </AppLink>
         </div>
       </div>
     </header>

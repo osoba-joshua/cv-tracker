@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import { Flame, Inbox, Search, SlidersHorizontal, Sparkles, Target, X, Zap } from "lucide-react";
 import { ageDays } from "@/lib/client";
 import { countryName } from "@/lib/geo";
+import { usePath } from "@/lib/nav";
 import { useApp } from "@/lib/store";
 import type { ScoredJob } from "@/lib/types";
 import { DEFAULT_FILTERS } from "./Filters";
@@ -64,7 +64,7 @@ function Results() {
     serverQuery, setServerQuery, tracked, settings, notice, dismissNotice, aiReading, hiddenIds, restoreHidden, setHelpOpen, helpOpen, selected,
     save, hide, openJob, paletteOpen,
   } = app;
-  const onDiscover = usePathname() === "/";
+  const onDiscover = usePath() === "/";
   const [visible, setVisible] = useState(PAGE);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [sheet, setSheet] = useState(false);
