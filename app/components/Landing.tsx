@@ -343,7 +343,10 @@ export default function Landing() {
           <p className="max-w-xl text-xs leading-relaxed">
             Job listings come from Remote OK, Remotive, Himalayas, Jobicy, Working Nomads and Arbeitnow (and Jooble / Adzuna when configured). Every job links to its original posting. Open source under the MIT license.
           </p>
-          <a href={REPO} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-fg"><GithubMark size={16} /> GitHub</a>
+          <div className="flex items-center gap-5">
+            <a href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer" className="hover:text-fg">Android &amp; iPhone apps</a>
+            <a href={REPO} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-fg"><GithubMark size={16} /> GitHub</a>
+          </div>
         </div>
       </footer>
     </div>

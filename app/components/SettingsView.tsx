@@ -1,7 +1,8 @@
 "use client";
 import { useRef, type ReactNode } from "react";
-import { Bot, Check, KeyRound, Database, Download, ExternalLink, Globe, Keyboard, Monitor, Moon, Palette, RotateCcw, Settings as Cog, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
+import { Bot, Check, KeyRound, Smartphone, Database, Download, ExternalLink, Globe, Keyboard, Monitor, Moon, Palette, RotateCcw, Settings as Cog, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
 import type { AiKeys } from "@/lib/ai";
+import { isNative } from "@/lib/http";
 import { clearAllData, downloadFile, exportBackup, importBackup } from "@/lib/backup";
 import { ACCENTS, type Accent, type DarkStyle, type Density, type ThemePref } from "@/lib/settings";
 import { useApp } from "@/lib/store";
@@ -10,6 +11,7 @@ import { Toggle } from "./Filters";
 import LocationPanel from "./LocationPanel";
 
 const REPO = "https://github.com/osoba-joshua/cv-tracker";
+const RELEASE = `${REPO}/releases/latest/download`;
 
 function Section({ icon: Icon, title, sub, children }: { icon: typeof Cog; title: string; sub?: string; children: ReactNode }) {
   return (
@@ -238,6 +240,25 @@ export default function SettingsView() {
         </div>
         <p className="mt-4 flex items-start gap-2 text-xs text-muted"><ShieldCheck size={14} className="mt-0.5 shrink-0 text-good" /> Backups contain your CV text and tracker. Keep the file somewhere safe.</p>
       </Section>
+
+      {!isNative() && (
+        <Section icon={Smartphone} title="Get the apps" sub="Same app, installed on your phone. Everything runs on the device, no account needed.">
+          <div className="flex flex-wrap gap-2">
+            <a className="btn" href={`${RELEASE}/CV-Tracker-android.apk`}>
+              <Smartphone size={15} /> Android (APK)
+            </a>
+            <a className="btn" href={`${RELEASE}/CV-Tracker-ios-unsigned.ipa`}>
+              <Smartphone size={15} /> iPhone (AltStore / Sideloadly)
+            </a>
+            <a className="btn btn-ghost" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">
+              All downloads <ExternalLink size={13} />
+            </a>
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-muted">
+            You can also install the website itself: in Chrome or Edge use <strong>Install app</strong>, in Safari use <strong>Share → Add to Home Screen</strong>. iPhone installs outside the App Store need a free Apple ID and AltStore or Sideloadly (the README explains it).
+          </p>
+        </Section>
+      )}
 
       <Section icon={Keyboard} title="Shortcuts & about">
         <div className="flex flex-wrap items-center gap-2">
