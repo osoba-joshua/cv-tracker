@@ -2,9 +2,10 @@
 import { useRef, type ReactNode } from "react";
 import { Bot, Check, Database, Download, ExternalLink, Globe, Keyboard, Monitor, Moon, Palette, RotateCcw, Settings as Cog, ShieldCheck, Sun, Trash2, Upload } from "lucide-react";
 import { clearAllData, downloadFile, exportBackup, importBackup } from "@/lib/backup";
-import { ACCENTS, type Accent, type Density, type ThemePref } from "@/lib/settings";
+import { ACCENTS, type Accent, type DarkStyle, type Density, type ThemePref } from "@/lib/settings";
 import { useApp } from "@/lib/store";
 import { GithubMark } from "./Logo";
+import { Toggle } from "./Filters";
 import LocationPanel from "./LocationPanel";
 
 const REPO = "https://github.com/osoba-joshua/cv-tracker";
@@ -73,6 +74,11 @@ export default function SettingsView() {
             <Segmented<ThemePref> label="Theme" value={settings.theme} onChange={(theme) => setSettings({ ...settings, theme })} options={[{ id: "system", label: "System", icon: Monitor }, { id: "light", label: "Light", icon: Sun }, { id: "dark", label: "Dark", icon: Moon }]} />
           </div>
           <div>
+            <p className="label">Dark style</p>
+            <Segmented<DarkStyle> label="Dark style" value={settings.variant ?? "default"} onChange={(variant) => setSettings({ ...settings, variant })} options={[{ id: "default", label: "Standard" }, { id: "midnight", label: "Midnight" }]} />
+            <p className="mt-2 text-xs text-muted">Midnight is pure black. It looks striking and saves battery on OLED screens. Applies in dark theme.</p>
+          </div>
+          <div>
             <p className="label">Accent colour</p>
             <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Accent colour">
               {ACCENTS.map((a) => (
@@ -95,6 +101,12 @@ export default function SettingsView() {
             <p className="label">Density</p>
             <Segmented<Density> label="Density" value={settings.density} onChange={(density) => setSettings({ ...settings, density })} options={[{ id: "comfortable", label: "Comfortable" }, { id: "compact", label: "Compact" }]} />
             <p className="mt-2 text-xs text-muted">Compact shows more jobs per screen by hiding skill chips on cards.</p>
+          </div>
+          <div>
+            <p className="label">Effects</p>
+            <Toggle checked={settings.effects !== false} onChange={(effects) => setSettings({ ...settings, effects })}>
+              Interactive effects <span className="text-xs text-muted">(moving background, glow, hover lighting)</span>
+            </Toggle>
           </div>
         </div>
       </Section>

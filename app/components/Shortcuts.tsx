@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 
 const KEYS: [string, string][] = [
   ["Ctrl / ⌘ + K", "Open the command palette"],
+  ["g then d i t c s", "Go to Discover, Insights, Tracker, CV, Settings"],
   ["j / k", "Next / previous job"],
   ["Enter", "Open the highlighted job"],
   ["s", "Save the highlighted job"],

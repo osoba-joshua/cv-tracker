@@ -4,6 +4,7 @@ import {
   DEFAULT_LOC, SAMPLE_CV, getSeen, markSeen, useDebounced, useLocalStorage,
   type Loc, type Stage, type Tracked,
 } from "./client";
+import { confetti } from "./confetti";
 import { countryByCode, detectCountry } from "./geo";
 import { haystack } from "./search";
 import { DEFAULT_SETTINGS, SETTINGS_KEY, applySettings, resolveTheme, type Settings } from "./settings";
@@ -401,14 +402,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [setTracked],
   );
   const setStage = useCallback(
-    (id: string, stage: Stage) =>
+    (id: string, stage: Stage) => {
+      if (stage === "offer" && tracked[id] && tracked[id].stage !== "offer") {
+        confetti();
+        toast("Congratulations on the offer! 🎉", { tone: "success" });
+      }
       setTracked((t) => {
         const ex = t[id];
         if (!ex || ex.stage === stage) return t;
         const now = new Date().toISOString();
         return { ...t, [id]: { ...ex, stage, updatedAt: now, history: [...(ex.history ?? []), { stage, at: now }] } };
-      }),
-    [setTracked],
+      });
+    },
+    [tracked, setTracked, toast],
   );
   const setNote = useCallback((id: string, note: string) => patch(id, { note }), [patch]);
   const setFollowUp = useCallback((id: string, followUp: string) => patch(id, { followUp: followUp || undefined }), [patch]);

@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, BarChart3, Bot, ChevronDown, Columns3, Globe, Lock, MapPin, Moon, ShieldCheck, Sparkles, Sun, Target, Zap } from "lucide-react";
 import { useApp } from "@/lib/store";
 import Dropzone from "./Dropzone";
+import InteractiveBackground from "./InteractiveBackground";
+import LiveDemo from "./LiveDemo";
+import Tilt from "./Tilt";
 import { CountrySelect } from "./LocationPanel";
 import Logo, { GithubMark } from "./Logo";
 import Reveal from "./Reveal";
@@ -108,8 +111,9 @@ export default function Landing() {
       </header>
 
       {/* ---------- hero ---------- */}
-      <section className="relative">
+      <section className="relative isolate">
         <div className="aurora" />
+        <InteractiveBackground />
         <div className="grid-bg absolute inset-x-0 top-0 -z-10 h-[34rem]" />
         <div className="mx-auto max-w-4xl px-4 pb-14 pt-14 text-center sm:pt-24">
           <span className="reveal reveal-1 chip chip-accent !py-1 !pl-2">
@@ -123,7 +127,7 @@ export default function Landing() {
           </p>
 
           <div id="upload" className="reveal reveal-4 mx-auto mt-10 max-w-2xl scroll-mt-24 text-left">
-            <div className="card p-3 sm:p-4" style={{ boxShadow: "var(--shadow-lg)" }}>
+            <div className="card beam p-3 sm:p-4" style={{ boxShadow: "var(--shadow-lg)" }}>
               <div className="mb-3 flex items-center gap-3 px-1">
                 <label htmlFor="home" className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
                   <MapPin size={15} className="text-accent" /> I&apos;m based in
@@ -155,6 +159,7 @@ export default function Landing() {
       {/* ---------- product preview ---------- */}
       <section className="mx-auto max-w-5xl px-4 pb-20" aria-label="Product preview">
         <Reveal>
+          <Tilt>
           <div className="card overflow-hidden !rounded-3xl" style={{ boxShadow: "var(--shadow-lg)" }}>
             <div className="flex items-center gap-1.5 border-b border-line bg-surface-2 px-4 py-2.5">
               <span className="h-2.5 w-2.5 rounded-full bg-bad/70" />
@@ -208,8 +213,12 @@ export default function Landing() {
               </div>
             </div>
           </div>
+          </Tilt>
         </Reveal>
       </section>
+
+      {/* ---------- live demo ---------- */}
+      <LiveDemo />
 
       {/* ---------- stats ---------- */}
       <section className="border-y border-line bg-card/50">

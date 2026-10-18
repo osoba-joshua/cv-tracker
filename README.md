@@ -13,8 +13,10 @@ Free forever, no account, no API keys required, and private by design: your CV a
 | **Landing** | **Discover** | **Why this score** |
 | ![Insights](docs/screenshots/insights.jpg) | ![Tracker](docs/screenshots/tracker.jpg) | ![CV review](docs/screenshots/cv-review.jpg) |
 | **Insights** | **Tracker** | **CV health check** |
-| ![Command palette](docs/screenshots/command-palette.jpg) | ![Light theme with emerald accent](docs/screenshots/discover-light.jpg) | |
-| **Command palette** | **Light theme, your accent** | |
+| ![Command palette](docs/screenshots/command-palette.jpg) | ![Light theme with emerald accent](docs/screenshots/discover-light.jpg) | ![Midnight dark style](docs/screenshots/midnight.jpg) |
+| **Command palette** | **Light theme, your accent** | **Midnight (pure black)** |
+| ![Interactive demo on the landing page](docs/screenshots/live-demo.jpg) | | |
+| **Try-it demo: skills re-rank jobs live** | | |
 
 ## What it does
 
@@ -35,11 +37,13 @@ Free forever, no account, no API keys required, and private by design: your CV a
 - **Free AI copilot** (optional): smarter CV reading, a fit check, tailored cover letters, interview prep, CV tailoring and an AI CV review. Works with free Gemini, Groq, OpenRouter or a local Ollama.
 
 **Delightful**
+- **Alive landing page.** A particle field that reacts to your cursor, an animated border on the upload box, a tilting product preview and a try-it demo where tapping skills re-ranks jobs in real time.
+- **Hover lighting.** Cards glow softly where your pointer is. Confetti when a job reaches Offer.
 - **Command palette** (`Ctrl/⌘ K`) to jump anywhere, apply filters or search.
-- **Keyboard shortcuts** (`j`/`k`, `Enter`, `s`, `x`, `/`, `?`), toasts with undo, a native-style tab bar and bottom sheets on phones.
-- **Make it yours**: light, dark or system theme, six accent colours, comfortable or compact density.
+- **Keyboard shortcuts**: `j`/`k`, `Enter`, `s`, `x`, `/`, `?`, and vim-style `g` then `d`/`i`/`t`/`c`/`s` to switch screens. Toasts with undo, a native-style tab bar and bottom sheets on phones.
+- **Make it yours**: light, dark or system theme, a pure-black Midnight style for OLED screens, six accent colours, comfortable or compact density, and a switch to turn all effects off.
 - **Installable** as an app on your phone or desktop. **Backup and restore** your data from Settings.
-- **Accessible**: semantic markup, keyboard navigation, focus management, reduced-motion support.
+- **Accessible**: semantic markup, keyboard navigation, focus management. Effects pause off-screen, render statically under reduced-motion, and can be disabled in Settings.
 
 ## Quick start
 

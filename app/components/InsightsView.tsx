@@ -10,7 +10,7 @@ import { Logo } from "./JobCard";
 
 function Card({ icon: Icon, title, sub, children, className = "" }: { icon: typeof Zap; title: string; sub?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`card p-5 ${className}`}>
+    <section className={`card card-hover p-5 ${className}`}>
       <div className="mb-4 flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Icon size={17} /></span>
         <div>
