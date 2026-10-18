@@ -91,7 +91,7 @@ You can set several. If one is rate limited or down, the next is tried automatic
 
 Most free job APIs only list remote work. For on-site jobs near you, add a free key:
 
-- **Jooble** (covers Nigeria and 70+ countries): https://jooble.org/api/about -> `JOOBLE_KEY`
+- **Jooble** (many countries; in testing it returned nothing for Nigeria, Ghana or Kenya, but worked for the UK, US, Germany and South Africa): https://jooble.org/api/about -> `JOOBLE_KEY`
 - **Adzuna** (UK, US, Canada, Australia, Germany, France, India, South Africa and more): https://developer.adzuna.com -> `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`
 
 Himalayas is queried with your country, so it already returns remote jobs that accept applicants from there.
@@ -165,6 +165,16 @@ There are two ways to build the app, and you can use either:
 - **Render (free plan):** [Deploy to Render](https://render.com/deploy?repo=https://github.com/osoba-joshua/cv-tracker) reads [render.yaml](render.yaml).
 - **Vercel:** [Deploy with Vercel](https://vercel.com/new/clone?repository-url=https://github.com/osoba-joshua/cv-tracker) (zero config).
 - Set `NEXT_PUBLIC_SITE_URL` to your public URL so share images resolve, add optional keys as environment variables, and keep `AI_RATE_LIMIT` low if AI is on. The in-memory job cache and rate limiter are per instance, which is fine for one server.
+
+### Hosted helper (AI and local jobs for everyone, no keys to paste)
+
+The static site and the phone apps run on the visitor's device, so they can't hold your API keys (anything shipped to a browser is public). To give every visitor working AI and Jooble/Adzuna jobs, run the **server build** somewhere (Render, Vercel, Docker; see above) with your keys as environment variables, then point the static site and apps at it:
+
+1. Deploy the server build and set `GEMINI_API_KEY` (or Groq/OpenRouter), `JOOBLE_KEY`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` there. Keep `AI_RATE_LIMIT` modest: each visitor gets that many AI requests per hour, so your free quota can't be drained by one person.
+2. In your GitHub repository go to Settings -> Secrets and variables -> Actions -> **Variables** and add `API_URL` = your server's URL (for example `https://cv-tracker.onrender.com`), or run `gh variable set API_URL --body https://your-server`.
+3. Re-run the Pages and Mobile workflows. The site and apps are built with `NEXT_PUBLIC_API_URL` and send AI and local-job requests to your server. CVs are still read and scored on the device; only the AI text and the search terms go to the helper.
+
+People who paste their own key in Settings still use it directly and bypass the helper. Free hosts sleep when idle, so the first AI request after a quiet period can take about 30 seconds.
 
 ### Building the apps yourself
 

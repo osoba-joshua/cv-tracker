@@ -56,8 +56,8 @@ export const aiStatus = (keys?: AiKeys) => {
 
 // --- Per-visitor rate limit so a public deployment can't burn through a free quota ---
 const hits = new Map<string, number[]>();
-export function checkRate(ip: string) {
-  const limit = Number(env("AI_RATE_LIMIT") ?? 40); // requests per hour per visitor
+export function checkRate(ip: string, max?: number) {
+  const limit = max ?? Number(env("AI_RATE_LIMIT") ?? 40); // requests per hour per visitor
   const now = Date.now();
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < 3_600_000);
   if (recent.length >= limit) throw new AiError("You've used a lot of AI requests this hour. Please try again later.", "rate_limited", 429);

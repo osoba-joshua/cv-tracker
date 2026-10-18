@@ -28,6 +28,8 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run build:static
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.API_URL }}
       - run: node scripts/mobile-assets.mjs
       - run: npx cap sync android
       - name: Accept Android SDK licenses
@@ -54,6 +56,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:static
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.API_URL }}
       - name: Create the iOS project
         run: npx cap add ios
       - run: node scripts/mobile-assets.mjs

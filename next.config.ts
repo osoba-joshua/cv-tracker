@@ -38,7 +38,18 @@ const nextConfig: NextConfig = {
         cacheComponents: true,
         partialPrefetching: true,
         async headers() {
-          return [{ source: "/:path*", headers: securityHeaders }];
+          return [
+          { source: "/:path*", headers: securityHeaders },
+          // The static site and phone apps call this server's /api as a "hosted helper" (see README)
+          {
+            source: "/api/:path*",
+            headers: [
+              { key: "Access-Control-Allow-Origin", value: "*" },
+              { key: "Access-Control-Allow-Methods", value: "GET,POST,OPTIONS" },
+              { key: "Access-Control-Allow-Headers", value: "content-type" },
+            ],
+          },
+        ];
         },
       }),
 };

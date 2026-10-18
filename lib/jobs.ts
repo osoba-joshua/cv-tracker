@@ -1,3 +1,4 @@
+import { HELPER_URL, helperLocalJobs } from "./helper";
 import { countryByCode, parseGeo } from "./geo";
 import { httpRequest } from "./http";
 import { levelFromTitle } from "./profile";
@@ -308,8 +309,8 @@ export async function findJob(id: string): Promise<Job | undefined> {
 
 /** Which optional local-job providers are configured (shown in the UI so people know how to get more local jobs). */
 export const localSourcesConfigured = () => ({
-  adzuna: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY),
-  jooble: !!process.env.JOOBLE_KEY,
+  adzuna: !!HELPER_URL || !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY),
+  jooble: !!HELPER_URL || !!process.env.JOOBLE_KEY,
 });
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -325,6 +326,20 @@ function dedupe(jobs: Job[]): Job[] {
     if (!cur || score(j) > score(cur)) best.set(k, j);
   }
   return [...best.values()];
+}
+
+/** Only the keyed local providers (Jooble, Adzuna). Served to the static site and phone apps by the hosted helper. */
+export async function fetchLocalJobs(searchTerms: string[], user: UserLocation): Promise<Job[]> {
+  const terms = [...new Set(searchTerms.map((t) => t.toLowerCase().trim()).filter(Boolean))].slice(0, 2);
+  const country = countryByCode(user.country);
+  const cc = user.country.toLowerCase();
+  const city = user.city.trim();
+  if (!country) return [];
+  const all = await Promise.all([
+    ...(ADZUNA_COUNTRIES.has(cc) ? terms.map((t) => cached(`adzuna:${cc}:${t}:${city}`, () => adzuna(cc, t, city))) : []),
+    ...terms.map((t) => cached(`jooble:${cc}:${t}:${city}`, () => jooble(t, city || country.name))),
+  ]);
+  return dedupe(all.flat());
 }
 
 export async function fetchJobs(searchTerms: string[], user: UserLocation): Promise<Job[]> {
@@ -354,6 +369,8 @@ export async function fetchJobs(searchTerms: string[], user: UserLocation): Prom
       ? terms.slice(0, 2).map((t) => cached(`adzuna:${cc}:${t}:${city}`, () => adzuna(cc, t, city)))
       : []),
     ...(country ? terms.slice(0, 2).map((t) => cached(`jooble:${cc}:${t}:${city}`, () => jooble(t, city || country.name))) : []),
+    // The static site and phone apps hold no keys: ask the hosted helper for local jobs instead
+    ...(HELPER_URL && country ? [cached(`helper:${cc}:${terms.slice(0, 2).join("+")}:${city}`, () => helperLocalJobs(terms.slice(0, 2), user))] : []),
   ]);
   return dedupe(jobs.flat());
 }

@@ -4,6 +4,20 @@
 import { AiError, aiStatus, type AiKeys } from "./ai";
 import { CoreError, coreAiCv, coreAiJob, coreAiProfile, coreJob, coreParse, coreSearch, coreStats } from "./core";
 import { EngineError, type Engine } from "./engine";
+import { HELPER_URL, HelperError, helperGet, helperPost } from "./helper";
+
+// With a hosted helper configured, people who haven't pasted their own AI key use the helper's.
+const hasOwnKey = (k?: AiKeys) => !!(k && Object.values(k).some((v) => typeof v === "string" && v.trim()));
+const viaHelper = (k?: AiKeys) => !!HELPER_URL && !hasOwnKey(k);
+const ask = <T,>(path: string, body: unknown) =>
+  wrap(async () => {
+    try {
+      return await helperPost<T>(path, body);
+    } catch (e) {
+      if (e instanceof HelperError) throw new EngineError(e.message, e.code);
+      throw e;
+    }
+  });
 
 async function wrap<T>(fn: () => Promise<T> | T): Promise<T> {
   try {
@@ -27,8 +41,17 @@ export const localEngine: Engine = {
   search: (body) => wrap(() => coreSearch(body)),
   job: (id) => wrap(() => coreJob(id)),
   stats: () => coreStats(),
-  aiStatus: async (keys?: AiKeys) => aiStatus(keys ?? {}),
-  aiProfile: (text, keys) => wrap(async () => (await coreAiProfile(text, keys ?? {})) as never),
-  aiJob: (body, keys) => wrap(async () => (await coreAiJob(body, keys ?? {})) as never),
-  aiCv: (body, keys) => wrap(async () => (await coreAiCv(body, keys ?? {})) as never),
+  aiStatus: async (keys?: AiKeys) => {
+    if (viaHelper(keys)) {
+      try {
+        return await helperGet<{ enabled: boolean; providers: string[] }>("/api/ai/status");
+      } catch {
+        return { enabled: false, providers: [] };
+      }
+    }
+    return aiStatus(keys ?? {});
+  },
+  aiProfile: (text, keys) => (viaHelper(keys) ? ask("/api/ai/profile", { text }) : wrap(async () => (await coreAiProfile(text, keys ?? {})) as never)),
+  aiJob: (body, keys) => (viaHelper(keys) ? ask("/api/ai/job", body) : wrap(async () => (await coreAiJob(body, keys ?? {})) as never)),
+  aiCv: (body, keys) => (viaHelper(keys) ? ask("/api/ai/cv", body) : wrap(async () => (await coreAiCv(body, keys ?? {})) as never)),
 };

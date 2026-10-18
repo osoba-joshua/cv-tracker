@@ -10,4 +10,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
+      # Add JOOBLE_KEY, ADZUNA_APP_ID and ADZUNA_APP_KEY in the dashboard too. To let the static site and phone apps use this
+      # server for AI and local jobs, set the GitHub Actions variable API_URL to this service's URL (see README, Hosted helper).
       # Optional free AI keys: add any of GEMINI_API_KEY, GROQ_API_KEY or OPENROUTER_API_KEY in the Render dashboard.
